@@ -412,8 +412,12 @@ class Mesh:
     def viewVels(self,save=False,fname='vels.png'):
         self.checkVels()
         fig = plt.figure()
-        axX = fig.add_subplot(211,aspect='equal')
-        axY = fig.add_subplot(212,aspect='equal')
+        if self.x > self.y:
+            subplotX, subplotY = 211, 212
+        else:
+            subplotX, subplotY = 121, 122
+        axX = fig.add_subplot(subplotX,aspect='equal')
+        axY = fig.add_subplot(subplotY,aspect='equal')
         axX.pcolormesh(self.xi,self.yi,self.VX, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VX))
         axY.pcolormesh(self.xi,self.yi,self.VY, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
         axX.set_title('$V_x$')
