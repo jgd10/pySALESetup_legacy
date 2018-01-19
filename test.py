@@ -30,15 +30,19 @@ for yA,yB in zip(YcoordsA,YcoordsB):
         grain1.place(xA,yA,1,mesh1)
         grain2.place(xB,yB,2,mesh1)
 
+fill = mesh1.calcVol([1,2])
+vfrac = fill/float(mesh1.Ncells)
 
+print "Total volume fraction of particles is: {:3.3f} %".format(vfrac*100.)
 
 
 mesh1.fillAll(3)
+print mesh1.matrixPorosity(3,50.)
 
 mesh1.viewMats()
 
-mesh1.plateVel(0.,1.5e-3,1500.,axis=1)
-mesh1.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
+#mesh1.plateVel(0.,1.5e-3,1500.,axis=1)
+#mesh1.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
 
 #mesh1.viewVels()
 

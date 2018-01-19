@@ -389,6 +389,7 @@ class Mesh:
     def __init__(self,X=500,Y=500,mats=9,cellsize=2.e-6):
         self.x = X
         self.y = Y
+        self.Ncells = X*Y
         self.width = X*cellsize
         self.height = Y*cellsize
         self.xc = np.arange(X)+0.5
@@ -401,7 +402,7 @@ class Mesh:
         self.VY = np.zeros((X,Y))
         self.cellsize = cellsize
         self.NoMats = mats
-    #def add_vel_to
+        self.mats = range(1,mats+1)
     def checkVels(self):
         total = np.sum(self.materials,axis=0)
         # make sure that all void cells have no velocity
@@ -458,6 +459,7 @@ class Mesh:
             mat_tofill  = 1. - present_mat
             # Fill chosen material mesh with the appropriate quantities
             self.materials[m-1] = mat_tofill 
+    
     def plateVel(self,ymin,ymax,vel,axis=0):
         assert ymin<ymax, "ERROR: ymin must be greater than ymax!"
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
@@ -469,9 +471,121 @@ class Mesh:
             assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
             self.VX[(self.yy>=ymin)*(self.yy<=ymax)] = vel[0]
             self.VY[(self.yy>=ymin)*(self.yy<=ymax)] = vel[1]
-    
-        
 
+    def calcVol(self,m=None):
+        if m is None:
+            Vol = np.sum(self.materials)
+        elif type(m) == int:
+            Vol = np.sum(self.materials[m-1])
+        elif type(m) == list:
+            Vol = 0
+            for mm in m:
+                Vol += np.sum(self.materials[mm-1])
+        else:
+            pass
+        return Vol
+
+    def matrixPorosity(self,matrix,bulk,void=False):
+        # bulk porosity must be taken as a percentage!
+        bulk /= 100.
+        matrix_vol = self.calcVol(matrix)
+        other = list(self.mats)
+        other.remove(matrix)
+        other_vol = self.calcVol(other)
+        other_vf = other_vol/float(matrix_vol+other_vol)
+        
+        total_vf = 1. - bulk
+        assert other_vf <= total_vf, "ERROR: The non-matrix volume fraction {:2.2f}% is too high for that bulk porosity {:2.2f}%!".format(other_vf*100.,bulk*100.)
+        remain_vf = total_vf - other_vf
+        # remaining solid volume (in matrix)
+        remain_vol = remain_vf*(matrix_vol+other_vol)
+        matrix_por = (matrix_vol - remain_vol)/float(matrix_vol)
+        return matrix_por*100.
+
+
+    def save(self,fname='meso_m.iSALE',noVel=False,info=False):
+        """
+        A function that saves the current mesh as a text file that can be read, verbatim into iSALE.
+        This compiles the integer indices of each cell, as well as the material in them and the fraction
+        of matter present. It saves all this as the filename specified by the user, with the default as 
+        meso_m.iSALE
+        
+        This version of the function works for continuous and solid materials, such as a multiple-plate setup.
+        It does not need to remake the mesh as there is no particular matter present.
+        
+        fname   : The filename to be used for the text file being used
+        mixed   : Are mixed cells used?
+        noVel   : Does not include velocities in meso_m.iSALE file
+        info    : Include particle ID (i.e. #) as a column in the final file 
+        
+        returns nothing but saves all the info as a txt file called 'fname' and populates the materials mesh.
+        """
+        ncells = self.x*self.y
+        if info:
+            OI    = np.zeros((ncells))
+            PI    = np.zeros((ncells))
+    
+        XI    = np.zeros((ncells))    
+        YI    = np.zeros((ncells))
+        UX    = np.zeros((ncells))
+        UY    = np.zeros((ncells))
+        K     = 0
+        for i in range(self.x):
+            for j in range(self.y):
+                XI[K] = j
+                YI[K] = i
+                UX[K] = self.VX[j,i]
+                UY[K] = self.VY[j,i]
+                if info:
+                    PI[K] = self.mesh[j,i]
+                for mm in range(self.NoMats):
+                    FRAC[mm,K] = self.materials[mm,j,i]
+                K += 1
+        FRAC = checkFRACs(FRAC)
+        HEAD = '{},{}'.format(K,Ms)
+        if noVel:
+            ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
+        elif info:
+            ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose(),PI))                                       
+        elif info and noVel:
+            ALL  = np.column_stack((XI,YI,FRAC.transpose(),PI))                                              
+        else:
+            ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))                                             
+        np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
+    
+    def checkFRACs(self,FRAC):
+        """
+        This function checks all the volume fractions in each cell and deals with any occurrences where they add to more than one
+        by scaling down ALL fractions in that cell, such that it is only 100% full.
+        
+        FRAC : Array containing the full fractions in each cell of each material
+        """
+        
+        if self.mixed==True:
+            for i in range(self.Ncells):
+                SUM = np.sum(FRAC[:,i])
+                if SUM > 1.:
+                    FRAC[:,i] /= SUM
+                else:
+                    pass
+        else:
+            for i in range(self.Ncells):
+                SUM = np.sum(FRAC[:,i])
+                if SUM > 1.:
+                    done = False
+                    for j in range(Self.NoMats):
+                        if FRAC[j,i] > 0 and done == False: 
+                            FRAC[j,i] = 1.
+                            done = True
+                        else:
+                            FRAC[j,i] = 0.
+                else:
+                    pass
+        
+        return FRAC
+        
+#class subMesh(Mesh):
+    #    def __init__(self,mesh,R0,R1,I0,I1):
 
 
 
