@@ -1,9 +1,9 @@
 import pySALESetup as pss
 import numpy as np
 
-mesh1 = pss.Mesh(X=500,Y=1500)
-grain1 = pss.Grain(eqr=50.)
-grain2 = pss.Grain(eqr=50.)
+mesh1 = pss.Mesh(X=50,Y=150,cellsize=2.e-5)
+grain1 = pss.Grain(eqr=5.)
+grain2 = pss.Grain(eqr=5.)
 
 
 
@@ -39,10 +39,12 @@ print "Total volume fraction of particles is: {:3.3f} %".format(vfrac*100.)
 mesh1.fillAll(3)
 print mesh1.matrixPorosity(3,50.)
 
-mesh1.viewMats()
+#mesh1.viewMats()
 
-#mesh1.plateVel(0.,1.5e-3,1500.,axis=1)
-#mesh1.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
+mesh1.plateVel(0.,1.5e-3,1500.,axis=1)
+mesh1.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
 
 #mesh1.viewVels()
+
+mesh1.save()
 

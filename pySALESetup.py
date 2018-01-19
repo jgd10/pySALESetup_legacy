@@ -386,7 +386,7 @@ class Ensemble:
         self.host_mesh.append(particle.hostmesh)
     
 class Mesh:
-    def __init__(self,X=500,Y=500,mats=9,cellsize=2.e-6):
+    def __init__(self,X=500,Y=500,mats=9,cellsize=2.e-6,mixed=False):
         self.x = X
         self.y = Y
         self.Ncells = X*Y
@@ -403,6 +403,7 @@ class Mesh:
         self.cellsize = cellsize
         self.NoMats = mats
         self.mats = range(1,mats+1)
+        self.mixed = mixed
     def checkVels(self):
         total = np.sum(self.materials,axis=0)
         # make sure that all void cells have no velocity
@@ -534,19 +535,30 @@ class Mesh:
         UX    = np.zeros((ncells))
         UY    = np.zeros((ncells))
         K     = 0
-        for i in range(self.x):
-            for j in range(self.y):
+        
+        # make list of used material numbers
+        usedmats = list(self.mats)
+        # iterate through them all
+        for mm in usedmats:
+            # If a material hasn't been used...
+            total = np.sum(self.materials[mm-1])
+            # ...remove from usedmats list
+            if total == 0.: usedmats.remove(mm)
+        NM = len(usedmats)
+        FRAC = np.zeros((NM,ncells))
+        for j in range(self.x):
+            for i in range(self.y):
                 XI[K] = j
                 YI[K] = i
                 UX[K] = self.VX[j,i]
                 UY[K] = self.VY[j,i]
                 if info:
                     PI[K] = self.mesh[j,i]
-                for mm in range(self.NoMats):
-                    FRAC[mm,K] = self.materials[mm,j,i]
+                for mm in range(NM):
+                    FRAC[mm,K] = self.materials[usedmats[mm]-1,j,i]
                 K += 1
-        FRAC = checkFRACs(FRAC)
-        HEAD = '{},{}'.format(K,Ms)
+        FRAC = self._checkFRACs(FRAC)
+        HEAD = '{},{}'.format(K,NM)
         if noVel:
             ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
         elif info:
@@ -557,7 +569,7 @@ class Mesh:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))                                             
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
     
-    def checkFRACs(self,FRAC):
+    def _checkFRACs(self,FRAC):
         """
         This function checks all the volume fractions in each cell and deals with any occurrences where they add to more than one
         by scaling down ALL fractions in that cell, such that it is only 100% full.
