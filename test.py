@@ -1,19 +1,21 @@
 import pySALESetup as pss
 import numpy as np
 
-mesh1 = pss.Mesh(X=250,Y=750,cellsize=4.e-6)
-grain1 = pss.Grain(eqr=25.)
-grain2 = pss.Grain(eqr=25.)
+mesh1 = pss.Mesh(X=100,Y=600,cellsize=1.e-5)
+
+poly_params=[[-1.,-1.],[-1.,1.],[1.,1.],[1.,-1.]]
+grain1 = pss.Grain(shape='polygon',eqr=10.,poly_params=poly_params)
+grain2 = pss.Grain(shape='polygon',eqr=10.,poly_params=poly_params)
 
 
 
 # Test area A (square lattice) ymin = 2.e-3 ymax = 2.5e-3
 XcoordsA = np.linspace(0.,1.e-3,5)
-YcoordsA = np.linspace(2.e-3,2.5e-3,3)
+YcoordsA = np.linspace(4.e-3,5.1e-3,5)
 
 # Test area B (hexagonal lattice) ymin = .5e-3 ymax = 1.e-3
 XcoordsB = np.linspace(0.,1.e-3,5)
-YcoordsB = np.linspace(.5e-3,1.e-3,3)
+YcoordsB = np.linspace(.9e-3,2.e-3,5)
 
 c = 0
 for yA,yB in zip(YcoordsA,YcoordsB):
@@ -37,13 +39,13 @@ print "Total volume fraction of particles is: {:3.3f} %".format(vfrac*100.)
 
 
 mesh1.fillAll(3)
-mesh1.plateVel(0.,1.5e-3,1500.,axis=1)
-mesh1.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
+mesh1.plateVel(0.,3.e-3,1500.,axis=1)
+mesh1.plateVel(3.e-3,6.e-3,-1500.,axis=1)
 mesh1.fillPlate(-1,2.988e-3,3.e-3)
 mesh1.fillPlate(-1,0.,0.012e-3)
-print mesh1.matrixPorosity(3,50.)
+mesh1.matrixPorosity(3,50.)
 mesh1.viewMats()
-mesh1.viewVels()
+#mesh1.viewVels()
 
 mesh1.save()
 

@@ -35,11 +35,14 @@ def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=
 
     """
     # If no coords provided use filepath
+    
     if R is None:
         J_ = np.genfromtxt(fname,comments='#',usecols=0,delimiter=',')
         I_ = np.genfromtxt(fname,comments='#',usecols=1,delimiter=',')
     # else use provided coords
     else:
+        if type(R) == list:
+            R = np.array(R)
         J_ = R[:,0]
         I_ = R[:,1]
 
@@ -74,13 +77,14 @@ def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=
     radii    = np.sqrt(I**2+J**2)
     maxwidth = int(2*np.amax(radii)+2)
     maxwidth = max(maxwidth,min_res)
+    if maxwidth%2!=0: maxwidth+=1
     # Add double max rad + 1 for mini mesh dims
     mesh_ = np.zeros((maxwidth,maxwidth))
 
     # define ref coord as 0,0 and centre to mesh_ centre
     qx = 0.                                                                                 
     qy = 0.                                                                                 
-    y0 = float(max_width/2.)
+    y0 = float(maxwidth/2.)
     x0 = y0
     
     I += x0
@@ -153,7 +157,7 @@ def gen_ellipse(r_,a_,e_):
     return mesh0
 
 class Grain:
-    def __init__(self, eqr=10., rot=0., shape='circle', File=None, trng_coords=None, rect_coords=None, elps_params=None, mixed=False):
+    def __init__(self, eqr=10., rot=0., shape='circle', File=None, trng_coords=None, rect_coords=None, elps_params=None, poly_params=None, mixed=False):
         self.equiv_rad = eqr
         self.angle = rot
         self.shape = shape
@@ -168,10 +172,13 @@ class Grain:
         elif self.shape == 'ellipse':
             assert len(elps_params) == 2, "ERROR: ellipse creation requires elps_params to be of the form [major radius, eccentricity]"
             self.mesh = gen_ellipse(elps_params[0],self.angle,elps_params[1])
+        elif self.shape == 'polygon':
+            assert len(poly_params) >= 3, "ERROR: Polygon creation requires at least 3 unique coordinates"
+            self.mesh = gen_shape_fromvertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed)
         else:
             print "ERROR: unsupported string -- {} --  used for shape.".format(self.shape)
-        self.Px, self.Py = np.shape(self.mesh)
         # more to be added...
+        self.Px,self.Py = np.shape(self.mesh)
     def view(self):
         fig = plt.figure()
         ax = fig.add_subplot(111,aspect='equal')
@@ -217,11 +224,12 @@ class Grain:
         I_final = Px 
         if (i_finl)>LX:                                                                                                                                     
             I_final -= abs(LX-i_finl)                                                                     
-            i_finl   = LX
+            i_finl   = LX-1
         J_final = Py
         if (j_finl)>LY:
             J_final -= abs(LY-j_finl) 
-            j_finl   = LY
+            j_finl   = LY-1
+        #print i_edge,j_edge
         Is = [I_initial,I_final]
         Js = [J_initial,J_final]
         i_ = [i_edge,i_finl]
@@ -263,6 +271,7 @@ class Grain:
         if self.mixed == False:
             for p in range(Js[1]-Js[0]):
                 for o in range(Is[1]-Is[0]):
+                    #print o,i_[0],p,j_[0],np.shape(temp_shape),np.shape(target.materials[0])
                     if temp_shape[o,p] == 1.: 
                         # if m = -1 then cells filled with void instead; also deletes existing material
                         if m == -1: 
@@ -520,7 +529,7 @@ class Mesh:
             pass
         return Vol
 
-    def matrixPorosity(self,matrix,bulk,void=False):
+    def matrixPorosity(self,matrix,bulk,void=False,Print=True):
         # bulk porosity must be taken as a percentage!
         bulk /= 100.
         matrix_vol = self.calcVol(matrix)
@@ -535,6 +544,9 @@ class Mesh:
         # remaining solid volume (in matrix)
         remain_vol = remain_vf*(matrix_vol+other_vol)
         matrix_por = (matrix_vol - remain_vol)/float(matrix_vol)
+        if Print:
+            distension = 1./(1.-matrix_por)
+            print "porosity = {:3.3f}% and distension = {:3.3f}".format(matrix_por*100.,distension)
         return matrix_por*100.
 
 
@@ -569,7 +581,7 @@ class Mesh:
         # make list of used material numbers
         usedmats = list(self.mats)
         # iterate through them all
-        for mm in usedmats:
+        for mm in self.mats:
             # If a material hasn't been used...
             total = np.sum(self.materials[mm-1])
             # ...remove from usedmats list
@@ -578,8 +590,8 @@ class Mesh:
         FRAC = np.zeros((NM,ncells))
         for j in range(self.x):
             for i in range(self.y):
-                XI[K] = j
-                YI[K] = i
+                XI[K] = i
+                YI[K] = j
                 UX[K] = self.VX[j,i]
                 UY[K] = self.VY[j,i]
                 if info:
@@ -589,6 +601,7 @@ class Mesh:
                 K += 1
         FRAC = self._checkFRACs(FRAC)
         HEAD = '{},{}'.format(K,NM)
+        print HEAD
         if noVel:
             ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
         elif info:
@@ -597,6 +610,7 @@ class Mesh:
             ALL  = np.column_stack((XI,YI,FRAC.transpose(),PI))                                              
         else:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))                                             
+        
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
     
     def _checkFRACs(self,FRAC):
