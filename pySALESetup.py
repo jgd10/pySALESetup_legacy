@@ -465,6 +465,36 @@ class Mesh:
             # Fill chosen material mesh with the appropriate quantities
             self.materials[m-1] = mat_tofill 
     
+    def fillPlate(self,m,MMin,MMax,axis=0):
+        """
+        Fills all rows (or columns if axis = 1) of mesh with material m between MMin and MMax. 
+        if m ==-1, it will fill it with void (essentially deleting existing matter). Otherwise 
+        existing material is prioritised.
+        """
+        if axis == 0:
+            condition = (self.yy<=MMax)*(self.yy>=MMin)
+        elif axis == 1:
+            condition = (self.xx<=MMax)*(self.xx>=MMin)
+        if m == -1:
+            # Erase all materials
+            self.materials[:,condition] *= 0.
+            self.VX[condition] *= 0.
+            self.VY[condition] *= 0.
+            self.mesh[condition] *= 0.
+        else:
+            # make a copy of the current material's mmesh
+            temp_materials = np.copy(self.materials[m-1])
+            # Sum all cells along material axes
+            summed_mats = np.sum(self.materials,axis=0)
+            # in the temp mesh, set all cells that are in the region of interest AND ARE ALSO not full
+            # to 1.
+            temp_materials[condition*(summed_mats<1.)] = 1. #- np.sum(materials,axis=0)  
+            # temp_materials now is the materials mesh but partially filled cells are also 1
+            # temp_2 
+            temp_2 = summed_mats*temp_materials
+            temp_materials -= temp_2
+            self.materials[m-1] += temp_materials
+
     def plateVel(self,ymin,ymax,vel,axis=0):
         assert ymin<ymax, "ERROR: ymin must be greater than ymax!"
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
