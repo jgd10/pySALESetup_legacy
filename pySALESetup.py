@@ -174,7 +174,7 @@ class Grain:
             self.mesh = gen_ellipse(elps_params[0],self.angle,elps_params[1])
         elif self.shape == 'polygon':
             assert len(poly_params) >= 3, "ERROR: Polygon creation requires at least 3 unique coordinates"
-            self.mesh = gen_shape_fromvertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed)
+            self.mesh = gen_shape_fromvertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
         else:
             print "ERROR: unsupported string -- {} --  used for shape.".format(self.shape)
         # more to be added...
