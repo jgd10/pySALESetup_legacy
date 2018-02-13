@@ -163,6 +163,7 @@ class Grain:
         self.shape = shape
         self.mixed = mixed
         self.hostmesh = None
+        self.mat = None
         if self.shape == 'circle' or self.shape =='sphere':
             self.radius = self.equiv_rad
             self.mesh = gen_circle(self.equiv_rad)
@@ -258,6 +259,7 @@ class Grain:
         assert abs(m) > 0, "ERROR: material number must not be 0. -1 is void."
         self.x = x
         self.y = y
+        self.mat = m
         if type(x)==int and type(y)==int:
             self.x = x*target.cellsize
             self.y = y*target.cellsize
@@ -321,7 +323,6 @@ class Grain:
             box[(target.yy<ybounds[0])] = 9999.
             box[(target.xx>xbounds[1])] = 9999.
             box[(target.xx<xbounds[0])] = 9999.
-
         nospace = True                                                                                       
         counter = 0                                                                                       
         passes  = 0                                                                                       
@@ -341,6 +342,7 @@ class Grain:
         else:
             self.x = x
             self.y = y
+            self.mat = m
             Is,Js,i_,j_ = self.cropGrain(self.Px,self.Py,target.x,target.y)
             self.materials[m-1, Is[0]:Is[1],Js[0],Js[1]] = self.mesh[i_[0]:i_[1],j_[0]:j_[1]]
         return 
@@ -379,20 +381,96 @@ class Grain:
         return
 
 class Ensemble:
-    def __init__(self,grains=[],rots=[],radii=[],hostmesh=[]):
+    def __init__(self,host_mesh,grains=[],rots=[],radii=[]):
+        assert hostmesh is not None, "ERROR: ensemble must have a host mesh"
         self.grains = grains
         self.number = 0
         self.rots   = rots
-        self.eqiv_r = radii
-        self.host_mesh = hostmesh
+        self.radii = radii
+        self.host = host_mesh
+        self.xc = []
+        self.yc = []
+        self.mats = []
 
     def add(self,particle):
-        assert particle.hostmesh is not None, "ERROR: grain must be placed in a mesh to be part of an ensemble"
         self.grains.append(particle)
-        self.number += 0
+        self.number += 1
         self.rots.append(particle.rot)
         self.radii.append(particle.equiv_rad)
-        self.host_mesh.append(particle.hostmesh)
+        self.xc.append(particle.x)
+        self.yc.append(particle.y)
+        self.mats.append(particle.mat)
+
+    def optimise_materials(self,mats):                        
+        """
+        This function has the greatest success and is based on that used in JP Borg's work with CTH.
+    
+        Function to assign material numbers to each particle
+        This function tries to optimise the assignments such
+        that as few particles of the same material are in co
+        ntact as possible. It works by creating an array of
+        all the particle material numbers within a box, 6 x 6
+        radii around each particle coord, as well as the corres
+        ponding coords.
+    
+        Then they are sorted into the order closest -> furthest.
+        Only the first M are considered (in this order). M is
+        the number of different materials being used. The
+        corresponding array of materials is checked against mats.
+        
+        If they contain all the same elements, there are no repeats
+        and all material numbers are used up => use that of the 
+        particle furthest away.
+    
+        If they do not, there is at least one repeat, select the
+        remaining material number or randomly select one of those
+        left, if there are more than one.
+    
+        Continue until all the particles are assigned.
+        
+        mats : array containing all the material numbers to be assigned
+        xc   : All the x coords of each particle centre. (array)
+        yc   :  "   "  y  "     "   "      "       "   . (array)
+        r    :  "   "  radii    "   "      "    . (array)
+    
+        Returns array 'MAT' containg an optimal material number for each grain
+        """
+        N    = self.number                                                               # No. of particles
+        M    = len(mats)
+        L    = self.host.GS                                                              # Length of one cell
+        MAT  = np.array(self.mats)                                                       # Array for all material numbers of all particles
+        i = 0                                                                            # Counts the number of particles that have been assigned
+        while i < N:                                                                     # Loop every particle and assign each one in turn.    
+            Ns = max(self.particle[i].Px,self.particle[i].Py)
+            xc = self.xc[i]
+            yc = self.yc[i]
+            lowx   = xc - 3.*Ns*L                                                        # Create a 'box' around each particle (in turn) that is 6Ns x 6Ns
+            higx   = xc + 3.*Ns*L
+            lowy   = yc - 3.*Ns*L
+            higy   = yc + 3.*Ns*L
+            boxmat = MAT[(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)]# Array containing a list of all material numbers within the 'box' 
+            boxx   =  xc[(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)]# Array containing the corresponding xcoords
+            boxy   =  yc[(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)]# and the ycoords
+            nn     =  np.size(boxmat)
+            D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             # Calculate the distances to the nearest particles
+            ind = np.argsort(D)                                                          # Sort the particles into order of distance from the considered particle
+            BXM = boxmat[ind]                                                            # Sort the materials into the corresponding order
+            DU  = np.unique(BXM[:M])                                                     # Only select the M closest particles
+            if np.array_equal(DU, mats):                                                 # If the unique elements in this array equate the array of 
+                                                                                         # materials then all are taken
+                mm     = BXM[M-1]                                                                           
+                MAT[i] = mm                                                              # Set the particle material to be of the one furthest from 
+                                                                                         # the starting particle
+                #materials[materials==-1*(i+1)] = mm                                     # Assign all filled cells 
+            else:                                                                        # Else there is a material in mats that is NOT in DU
+                indices = np.in1d(mats,DU,invert=True)                                   # This finds the indices of all elements that only appear in 
+                                                                                         # mats and not DU
+                mm      = np.random.choice(mats[indices],1)
+                MAT[i]  = mm                                                             # Randomly select one to be the current particle's material number
+                #materials[materials==-1*(i+1)] = mm
+            i += 1                                                                       # Increment i
+        self.mats = list(MAT.astype(int))
+        return 
     
 class Mesh:
     def __init__(self,X=500,Y=500,mats=9,cellsize=2.e-6,mixed=False):
@@ -419,6 +497,35 @@ class Mesh:
         self.VX[total==0.] = 0.
         self.VY[total==0.] = 0.
     
+    def max_porosity_variation(self,partitions=2):
+        """
+        Function that finds the largest varition in porosity across the entire mesh. 
+        This will give incorrect answers when the mesh is not purely granular.
+        returns the maximum difference between two partitions of the same orientation.
+        """
+        mesh = np.sum(self.materials,axis=0)
+        mesh[mesh>1.] = 1.
+        pores = 1.-mesh
+    
+        # create arrays to store vert and horiz partition porosities
+        pores_T = np.ones(partitions)*-9999.
+        pores_L = np.ones(partitions)*-9999.
+    
+        # divide the mesh into intervals divT and divL wide
+        divT = int(float(self.x)/float(partitions))
+        divL = int(float(self.y)/float(partitions))
+        for p in range(partitions):
+            pores_T[p] = np.mean(mesh[p*divT:(p+1)*divT,:])
+            pores_L[p] = np.mean(mesh[:,p*divL:(p+1)*divL])
+        
+        # find the maximum difference between partitions
+        maxdiff_T = np.amax(pores_T) - np.amin(pores_T)
+        maxdiff_L = np.amax(pores_L) - np.amin(pores_L)
+        
+        # Find the largest of these two
+        maxdiff = max(maxdiff_T,maxdiff_L)
+        return maxdiff
+
     def viewVels(self,save=False,fname='vels.png'):
         self.checkVels()
         fig = plt.figure()
@@ -458,7 +565,7 @@ class Mesh:
     def fillAll(self,m):
         """
         Fills entire mesh with material m. if m ==-1, it will fill it with void (essentially 
-        deleting all contents of the mesh). Otherwise existing material is prioritised.
+        deleting all contents of the mesh). Otherwise existing material is prioritised. Equivalent to clear.
         """
         if m == -1:
             # Erase all materials
@@ -644,12 +751,6 @@ class Mesh:
         
         return FRAC
         
-#class subMesh(Mesh):
-    #    def __init__(self,mesh,R0,R1,I0,I1):
-
-
-
-
 class Polygonal_object:
     def __init__(self,xcoords,ycoords,m,target):
         # last point MUST be identical to first; append to end if necessary
