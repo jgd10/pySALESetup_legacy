@@ -168,7 +168,7 @@ class Grain:
             self.mesh = gen_circle(self.equiv_rad)
         elif self.shape == 'file':
             assert File is not None, "No file path provided to create grain"
-            self.mesh = gen_shape_fromvertices(fname=File,eqv_rad=self.equiv_rad,mixed=self.mixed)
+            self.mesh = gen_shape_fromvertices(fname=File,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=self.angle)
         elif self.shape == 'ellipse':
             assert len(elps_params) == 2, "ERROR: ellipse creation requires elps_params to be of the form [major radius, eccentricity]"
             self.mesh = gen_ellipse(elps_params[0],self.angle,elps_params[1])
