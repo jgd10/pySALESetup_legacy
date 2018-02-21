@@ -386,6 +386,7 @@ class Grain:
         return nospace                                                                                  
 
     def insert_randomwalk(self):
+        # Not yet implemented
         self.hostmesh = target
         return
 
@@ -500,7 +501,6 @@ class Ensemble:
                                                                                          # the starting particle
             else:                                                                        # Else there is a material in mats that is NOT in DU
                 indices = np.in1d(matsARR,DU,invert=True)                                # This finds the indices of all elements that only appear in 
-                print matsARR[indices]
                                                                                          # mats and not DU
                 mm      = np.random.choice(matsARR[indices],1)
                 MAT[i]  = mm                                                             # Randomly select one to be the current particle's material number
