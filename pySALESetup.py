@@ -230,12 +230,17 @@ class Grain:
         I_final = Px 
         if (i_finl)>LX:                                                                                                                                     
             I_final -= abs(LX-i_finl)                                                                     
+            # additional -1 because end of array index is always included
+            # but the reverse is not true for start: e.g. A[0:2] will include the
+            # '0'th element but NOT the '2'th element
+            I_final -= 1
             i_finl   = LX-1
         J_final = Py
         if (j_finl)>LY:
             J_final -= abs(LY-j_finl) 
+            J_final -= 1
             j_finl   = LY-1
-        #print i_edge,j_edge
+        
         Is = [I_initial,I_final]
         Js = [J_initial,J_final]
         i_ = [i_edge,i_finl]
@@ -265,12 +270,15 @@ class Grain:
         self.x = x
         self.y = y
         self.mat = m
-        if type(x)==int and type(y)==int:
+        print type(x),'first'
+        if (type(x)==int and type(y)==int) | (type(x)==np.int64 and type(y)==np.int64):
             self.x = x*target.cellsize
             self.y = y*target.cellsize
+            print self.x
         else:
             x = int(x/target.cellsize)
             y = int(y/target.cellsize)
+        print type(x),'2nd'
         if type(m) == float or type(m) == np.float64: m = int(m)
         Is,Js,i_,j_ = self.cropGrain(x,y,self.Px,self.Py,target.x,target.y)
         # slice ammunition grain for the target
@@ -334,8 +342,8 @@ class Grain:
         indices = np.where(box==0.)                                                          
         indices = np.column_stack(indices)                                                                                                          
         while nospace:                                                                                 
-            y,x   = random.choice(indices)                                                                
-            nospace = checkCoords_full(x,y,target)                                                          
+            x,y   = random.choice(indices)                                                                
+            nospace = self.checkCoords(x,y,target)                                                          
             counter += 1                                                                                  
             if counter>5000:                                                                              
                 nospace = True                                                                                
@@ -348,8 +356,7 @@ class Grain:
             self.x = x
             self.y = y
             self.mat = m
-            Is,Js,i_,j_ = self.cropGrain(self.Px,self.Py,target.x,target.y)
-            self.materials[m-1, Is[0]:Is[1],Js[0],Js[1]] = self.mesh[i_[0]:i_[1],j_[0]:j_[1]]
+            self.place(x,y,m,target)
         return 
     def checkCoords(self,x,y,target):                                                                        
         """
@@ -370,8 +377,8 @@ class Grain:
         nospace = False                                                                                    
         Is,Js,i_,j_ = self.cropGrain(x,y,self.Px,self.Py,target.x,target.y)
         
-        temp_shape = np.copy(shape[Js[0]:Js[1],Is[0]:Is[1]])                                    
-        temp_mesh  = np.copy(mesh[j_[0]:j_[1],i_[0]:i_[1]])                                            
+        temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])                                    
+        temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])                                            
         test       = np.minimum(temp_shape,temp_mesh)                                                       
                                                                                                             
         if (np.sum(test) > 0):                                                                              
