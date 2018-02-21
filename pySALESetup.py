@@ -2,6 +2,7 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
+from collections import Counter
 
 def polygon_area(X,Y):
     N = np.size(X)
@@ -167,15 +168,19 @@ class Grain:
         if self.shape == 'circle' or self.shape =='sphere':
             self.radius = self.equiv_rad
             self.mesh = gen_circle(self.equiv_rad)
+            self.area = np.sum(self.mesh)
         elif self.shape == 'file':
             assert File is not None, "No file path provided to create grain"
             self.mesh = gen_shape_fromvertices(fname=File,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=self.angle)
+            self.area = np.sum(self.mesh)
         elif self.shape == 'ellipse':
             assert len(elps_params) == 2, "ERROR: ellipse creation requires elps_params to be of the form [major radius, eccentricity]"
             self.mesh = gen_ellipse(elps_params[0],self.angle,elps_params[1])
+            self.area = np.sum(self.mesh)
         elif self.shape == 'polygon':
             assert len(poly_params) >= 3, "ERROR: Polygon creation requires at least 3 unique coordinates"
             self.mesh = gen_shape_fromvertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
+            self.area = np.sum(self.mesh)
         else:
             print "ERROR: unsupported string -- {} --  used for shape.".format(self.shape)
         # more to be added...
@@ -381,12 +386,14 @@ class Grain:
         return
 
 class Ensemble:
-    def __init__(self,host_mesh,grains=[],rots=[],radii=[]):
+    def __init__(self,host_mesh,grains=[],rots=[],radii=[],areas=[]):
         assert hostmesh is not None, "ERROR: ensemble must have a host mesh"
         self.grains = grains
         self.number = 0
         self.rots   = rots
-        self.radii = radii
+        self.radii = [r*host_mesh.cellsize for r in radii]
+        self.areas = [a*host_mesh.cellsize**2. for a in areas]
+        self.phi = _krumbein_phi()
         self.host = host_mesh
         self.xc = []
         self.yc = []
@@ -400,7 +407,26 @@ class Ensemble:
         self.xc.append(particle.x)
         self.yc.append(particle.y)
         self.mats.append(particle.mat)
+        self.phi.append(-np.log2(particle.equiv_rad))
 
+    def _krumbein_phi(self):
+        phi = []
+        # Krumbein phi = -log_2(D/D0) where D0 = 1 mm and D = diameter
+        for r in self.radii:
+            p = -np.log2(2*r)
+            phi.append(p)
+        return phi
+
+    def _vfrac(self):
+        self.vfrac = np.sum(self.areas)/self.host.area
+
+    def frequency(self):
+        self.frequencies = Counter(self.phi)
+
+    def area_weights():
+        ensemble_area = _vfrac()*self.host.area
+        self.area_weights = [100.*a/ensemble_area for a in self.areas]
+    
     def optimise_materials(self,mats):                        
         """
         This function has the greatest success and is based on that used in JP Borg's work with CTH.
@@ -479,6 +505,7 @@ class Mesh:
         self.Ncells = X*Y
         self.width = X*cellsize
         self.height = Y*cellsize
+        self.area = self.Ncells*cellsize
         self.xc = np.arange(X)+0.5
         self.yc = np.arange(Y)+0.5
         self.yi, self.xi = np.meshgrid(self.yc,self.xc)
@@ -491,6 +518,7 @@ class Mesh:
         self.NoMats = mats
         self.mats = range(1,mats+1)
         self.mixed = mixed
+
     def checkVels(self):
         total = np.sum(self.materials,axis=0)
         # make sure that all void cells have no velocity
