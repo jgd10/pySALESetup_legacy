@@ -270,15 +270,12 @@ class Grain:
         self.x = x
         self.y = y
         self.mat = m
-        print type(x),'first'
         if (type(x)==int and type(y)==int) | (type(x)==np.int64 and type(y)==np.int64):
             self.x = x*target.cellsize
             self.y = y*target.cellsize
-            print self.x
         else:
             x = int(x/target.cellsize)
             y = int(y/target.cellsize)
-        print type(x),'2nd'
         if type(m) == float or type(m) == np.float64: m = int(m)
         Is,Js,i_,j_ = self.cropGrain(x,y,self.Px,self.Py,target.x,target.y)
         # slice ammunition grain for the target
@@ -394,13 +391,13 @@ class Grain:
 
 class Ensemble:
     def __init__(self,host_mesh,grains=[],rots=[],radii=[],areas=[]):
-        assert hostmesh is not None, "ERROR: ensemble must have a host mesh"
+        assert host_mesh is not None, "ERROR: ensemble must have a host mesh"
         self.grains = grains
         self.number = 0
         self.rots   = rots
         self.radii = [r*host_mesh.cellsize for r in radii]
         self.areas = [a*host_mesh.cellsize**2. for a in areas]
-        self.phi = _krumbein_phi()
+        self.phi = self._krumbein_phi()
         self.host = host_mesh
         self.xc = []
         self.yc = []
@@ -409,7 +406,7 @@ class Ensemble:
     def add(self,particle):
         self.grains.append(particle)
         self.number += 1
-        self.rots.append(particle.rot)
+        self.rots.append(particle.angle)
         self.radii.append(particle.equiv_rad)
         self.xc.append(particle.x)
         self.yc.append(particle.y)
@@ -470,39 +467,47 @@ class Ensemble:
         """
         N    = self.number                                                               # No. of particles
         M    = len(mats)
-        L    = self.host.GS                                                              # Length of one cell
+        L    = self.host.cellsize                                                        # Length of one cell
+        assert type(mats)==np.ndarray,"ERROR: material list must be a numpy array!"
+        matsARR = np.array(mats)
         MAT  = np.array(self.mats)                                                       # Array for all material numbers of all particles
+        xcARR = np.array(self.xc)
+        ycARR = np.array(self.yc)
         i = 0                                                                            # Counts the number of particles that have been assigned
         while i < N:                                                                     # Loop every particle and assign each one in turn.    
-            Ns = max(self.particle[i].Px,self.particle[i].Py)
+            Ns = max(self.grains[i].Px,self.grains[i].Py)
             xc = self.xc[i]
             yc = self.yc[i]
             lowx   = xc - 3.*Ns*L                                                        # Create a 'box' around each particle (in turn) that is 6Ns x 6Ns
             higx   = xc + 3.*Ns*L
             lowy   = yc - 3.*Ns*L
             higy   = yc + 3.*Ns*L
-            boxmat = MAT[(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)]# Array containing a list of all material numbers within the 'box' 
-            boxx   =  xc[(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)]# Array containing the corresponding xcoords
-            boxy   =  yc[(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)]# and the ycoords
+            # consider grains in the box that are also NOT the grain being considered!
+            condition =(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)*(self.xc!=xc)*(self.yc!=yc) 
+            boxmat =     MAT[condition]                                                  # Array containing a list of all material numbers within the 'box' 
+            boxx   =   xcARR[condition]                                                  # Array containing the corresponding xcoords
+            boxy   =   ycARR[condition]                                                  # and the ycoords
             nn     =  np.size(boxmat)
             D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             # Calculate the distances to the nearest particles
             ind = np.argsort(D)                                                          # Sort the particles into order of distance from the considered particle
             BXM = boxmat[ind]                                                            # Sort the materials into the corresponding order
+            #print boxmat
             DU  = np.unique(BXM[:M])                                                     # Only select the M closest particles
-            if np.array_equal(DU, mats):                                                 # If the unique elements in this array equate the array of 
+            if np.array_equal(DU, matsARR):                                              # If the unique elements in this array equate the array of 
                                                                                          # materials then all are taken
-                mm     = BXM[M-1]                                                                           
+                mm     = BXM[M]                                                                           
                 MAT[i] = mm                                                              # Set the particle material to be of the one furthest from 
                                                                                          # the starting particle
-                #materials[materials==-1*(i+1)] = mm                                     # Assign all filled cells 
             else:                                                                        # Else there is a material in mats that is NOT in DU
-                indices = np.in1d(mats,DU,invert=True)                                   # This finds the indices of all elements that only appear in 
+                indices = np.in1d(matsARR,DU,invert=True)                                # This finds the indices of all elements that only appear in 
+                print matsARR[indices]
                                                                                          # mats and not DU
-                mm      = np.random.choice(mats[indices],1)
+                mm      = np.random.choice(matsARR[indices],1)
                 MAT[i]  = mm                                                             # Randomly select one to be the current particle's material number
                 #materials[materials==-1*(i+1)] = mm
             i += 1                                                                       # Increment i
         self.mats = list(MAT.astype(int))
+        #print self.mats
         return 
     
 class Mesh:
