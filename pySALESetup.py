@@ -206,6 +206,8 @@ class Grain:
         i_,j_ : indices for the minimesh
 
         """
+        self.Px,self.Py = np.shape(self.mesh)
+        Px, Py = self.Px,self.Py
         i_edge = x - Px/2
         j_edge = y - Py/2
         i_finl = x + Px/2
@@ -437,7 +439,7 @@ class Ensemble:
         ensemble_area = _vfrac()*self.host.area
         self.area_weights = [100.*a/ensemble_area for a in self.areas]
     
-    def optimise_materials(self,mats):                        
+    def optimise_materials(self,mats=np.array([1,2,3,4,5,6,7,8,9])):                        
         """
         This function has the greatest success and is based on that used in JP Borg's work with CTH.
     
