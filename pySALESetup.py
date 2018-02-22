@@ -138,14 +138,15 @@ def gen_ellipse(r_,a_,e_):
     a_ : the angle of rotation (in radians)
     e_ : the eccentricity of the ellipse
     """
-    mesh0 = np.zeros((2*r_+2,2*r_+2))
+    N = int(2.*r_+2.)
+    mesh0 = np.zeros((N,N))
     x0 = r_ + 1                                                                                   
     y0 = r_ + 1                                                                                   
     # A is the semi-major radius, B is the semi-minor radius
     A = r_
     B = A*np.sqrt(1.-e_**2.)                                                                                
-    for j in range(Ns):
-        for i in range(Ns):
+    for j in range(N):
+        for i in range(N):
             xc = 0.5*(i + (i+1)) - x0
             yc = 0.5*(j + (j+1)) - y0 
             
@@ -177,6 +178,8 @@ class Grain:
             assert len(elps_params) == 2, "ERROR: ellipse creation requires elps_params to be of the form [major radius, eccentricity]"
             self.mesh = gen_ellipse(elps_params[0],self.angle,elps_params[1])
             self.area = np.sum(self.mesh)
+            self.eccentricity = elps_params[1]
+            self.radius = elps_params[0]
         elif self.shape == 'polygon':
             assert len(poly_params) >= 3, "ERROR: Polygon creation requires at least 3 unique coordinates"
             self.mesh = gen_shape_fromvertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
