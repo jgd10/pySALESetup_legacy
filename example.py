@@ -1,7 +1,12 @@
 import pySALESetup as pss
 import numpy as np
 
+g = []
 grain = pss.Grain()
+g.append(grain)
+grain = pss.Grain()
+
+g.append(grain)
 mesh = pss.Mesh(X=600,Y=100)
 mesh2 = pss.Mesh(X=600,Y=100)
 
@@ -9,8 +14,10 @@ mesh2 = pss.Mesh(X=600,Y=100)
 
 
 
-grain.place(300,50,m=2,target=mesh)
-grain.place(300,60,m=3,target=mesh)
+g[0].place(300,50,m=2,target=mesh)
+g[1].place(300,60,m=3,target=mesh)
+
+print g[0].dum,g[1].dum
 
 group1 = pss.Ensemble(mesh)
 for i in range(100):

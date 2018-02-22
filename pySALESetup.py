@@ -413,6 +413,7 @@ class Ensemble:
         self.yc.append(particle.y)
         self.mats.append(particle.mat)
         self.phi.append(-np.log2(particle.equiv_rad))
+        self.areas.append(particle.area)
 
     def _krumbein_phi(self):
         phi = []
@@ -425,8 +426,12 @@ class Ensemble:
     def _vfrac(self):
         self.vfrac = np.sum(self.areas)/self.host.area
 
+    def print_vfrac(self):
+        print self._vfrac()
+    
     def frequency(self):
         self.frequencies = Counter(self.phi)
+        self.areaFreq = Counter(self.areas)
 
     def area_weights():
         ensemble_area = _vfrac()*self.host.area
