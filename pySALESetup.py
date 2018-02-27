@@ -1,4 +1,3 @@
-import numpy as np
 import random
 import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
@@ -345,9 +344,9 @@ class Grain:
         indices = np.column_stack(indices)                                                                                                          
         while nospace:                                                                                 
             x,y   = random.choice(indices)                                                                
-            nospace = self.checkCoords(x,y,target)                                                          
+            nospace, overlap = self.checkCoords(x,y,target)                                                          
             counter += 1                                                                                  
-            if counter>5000:                                                                              
+            if counter>10000:                                                                              
                 nospace = True                                                                                
                 passes= 1                                                                                 
                 print "No coords found after {} iterations; exiting".format(counter)
@@ -360,7 +359,7 @@ class Grain:
             self.mat = m
             self.place(x,y,m,target)
         return 
-    def checkCoords(self,x,y,target):                                                                        
+    def checkCoords(self,x,y,target,overlap_max=0.):                                                                        
         """
         This function checks if the grain will overlap with any other material;
         and if it can be placed.
@@ -382,17 +381,86 @@ class Grain:
         temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])                                    
         temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])                                            
         test       = np.minimum(temp_shape,temp_mesh)                                                       
-                                                                                                            
-        if (np.sum(test) > 0):                                                                              
-            nospace = True
-            pass                                                                                            
-        elif(np.sum(test) == 0):                                                                            
-            pass
-        return nospace                                                                                  
 
-    def insert_randomwalk(self):
+        overlapping_cells = np.sum(test)
+                                                                                                            
+        if (overlapping_cells > overlap_max):                                                                              
+            nospace = True
+        elif(overlapping_cells == 0):                                                                        
+            pass
+        return nospace, overlapping_cells
+
+    def insertRandomwalk(self,target,m,xbounds=None,ybounds=None):
         # Not yet implemented
-        self.hostmesh = target
+        box = None
+        box = np.sum(target.materials,axis=0)
+        XCELLMAX = target.x 
+        XCELLMIN = 0
+        YCELLMAX = target.y
+        YCELLMIN = 0
+        if xbounds is None and ybounds is not None:
+            # ensure all cells in box outside of ymin and ymax won't be considered
+            box[(target.yy>ybounds[1])] = 9999.
+            box[(target.yy<ybounds[0])] = 9999.
+            YCELLMAX = int((ybounds[1]-np.amin(target.yy))/target.cellsize)
+            YCELLMIN = int((ybounds[0]-np.amin(target.yy))/target.cellsize)
+        elif ybounds is None and xbounds is not None:
+            # ensure all cells in box outside of xmin and xmax won't be considered
+            box[(target.xx>xbounds[1])] = 9999.
+            box[(target.xx<xbounds[0])] = 9999.
+            XCELLMAX = int((xbounds[1]-np.amin(target.xx))/target.cellsize)
+            XCELLMIN = int((xbounds[0]-np.amin(target.xx))/target.cellsize)
+        elif xbounds is not None and ybounds is not None: 
+            # Same proceedure if both given
+            box[(target.yy>ybounds[1])] = 9999.
+            box[(target.yy<ybounds[0])] = 9999.
+            box[(target.xx>xbounds[1])] = 9999.
+            box[(target.xx<xbounds[0])] = 9999.
+            XCELLMAX = int((xbounds[1]-np.amin(target.xx))/target.cellsize)
+            XCELLMIN = int((xbounds[0]-np.amin(target.xx))/target.cellsize)
+            YCELLMAX = int((ybounds[1]-np.amin(target.yy))/target.cellsize)
+            YCELLMIN = int((ybounds[0]-np.amin(target.yy))/target.cellsize)
+        cell_limit = max(np.sum(self.area)/100.,1)                                                # Max number of overlapping cells should scale with area.
+        
+                                                                                                            # area ~= 110 cells for 6cppr
+                                                                                                            # Does NOT need to be integer since values in the mesh are floats, 
+                                                                                                            # and it is their sum that is calculated.
+        touching   = False                                                                                        # Initialise the indicators for this function
+        passes     = 1                                                                                        # here are 'passes' and 'counter' similar to check_coords_full
+        counter    = 0                                                                                        # But this time there is 'touching' which indicates
+                                                                                                            # contact between particles
+        indices = np.where(box==0.)                                                          
+        indices = np.column_stack(indices)                                                                                                          
+        x,y   = random.choice(indices)                                                                
+        end = False
+        while not touching:    
+            if x > XCELLMAX: x = XCELLMIN
+            if x < XCELLMIN: x = XCELLMAX
+            if y > YCELLMAX: y = YCELLMAX
+            if y < YCELLMIN: y = YCELLMIN                                                            # If the coord moves out of the mesh, wrap back around.
+            nospace, overlap = self.checkCoords(x,y,target,overlap_max=cell_limit)                                                          
+            counter += 1                                                                                  
+            if counter>100000:                                                                              
+                passes = 1                                                                                 
+                print "No coords found after {} iterations; exiting".format(counter)
+                break
+        
+            if nospace or (nospace == False  and overlap == 0):
+                dx = random.randint(-self.radius,self.radius)
+                dy = random.randint(-self.radius,self.radius)
+                x += dx
+                y += dy
+            elif nospace == False and overlap > 0 and overlap <= cell_limit:
+                touching = True
+                break
+        x = np.int64(x)
+        y = np.int64(y)
+        if touching:
+            self.x = x
+            self.y = y
+            self.mat = m
+            self.place(x,y,m,target)
+                                                                                                            # place shape here.
         return
 
 class Ensemble:

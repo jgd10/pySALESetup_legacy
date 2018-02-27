@@ -22,7 +22,10 @@ for i in range(100):
     ecc = random.random()
     grain = pss.Grain(shape='ellipse',rot=rot,elps_params=[10.,ecc])
     g.append(grain)
-    grain.insertRandomly(mesh,1)
+    if i == 0: 
+        grain.insertRandomly(mesh,1)
+    else:
+        grain.insertRandomwalk(mesh,1)
     group1.add(grain)
 
 
@@ -37,7 +40,7 @@ for x,y,g,m in zip(group1.xc,group1.yc,group1.grains,group1.mats):
     g.place(x,y,6,mesh2)
 mesh2.fillAll(m=7)
 
-mesh1.plateVel(0.,1.5e-3,1500.,axis=1)
-mesh1.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
+mesh2.plateVel(0.,1.5e-3,1500.,axis=1)
+mesh2.plateVel(1.5e-3,3.e-3,-1500.,axis=1)
 
 mesh2.viewMats()
