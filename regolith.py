@@ -130,3 +130,96 @@ meshC = pss.combine_meshes(meshA,meshB,axis=1)
 meshC.top_and_tail()
 meshC.viewMats()
 meshC.save(fname='regolith_circles.iSALE')
+
+meshA.fillAll(-1)
+meshB.fillAll(-1)
+
+r = 0.5
+
+r *= np.pi
+
+off = .8
+
+R = [[-1.,-1.],
+     [-1.,1.],
+     [1.,-1.],
+     [1.,-1.]]
+
+R[2][1] += off
+
+for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
+    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r*3)
+    grain1.place(xA,yA,mA,meshA)
+for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r)
+    grain2.place(xB,yB,mB,meshB)
+
+meshA.fillAll(9)
+meshB.fillAll(9)
+meshA.blanketVel(+1500.,axis=1)
+meshB.blanketVel(-1500.,axis=1)
+meshD = pss.combine_meshes(meshA,meshB,axis=1)
+meshD.top_and_tail()
+meshD.viewMats()
+meshD.save(fname='regolith_tetrahedracritangle.iSALE')
+meshA.fillAll(-1)
+meshB.fillAll(-1)
+
+r = 0.5
+
+r *= np.pi
+
+off = 2.
+
+R = [[-1.,-1.],
+     [-1.,1.],
+     [1.,-1.],
+     [1.,-1.]]
+
+R[2][1] += off
+
+for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
+    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r*3)
+    grain1.place(xA,yA,mA,meshA)
+for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r)
+    grain2.place(xB,yB,mB,meshB)
+
+meshA.fillAll(9)
+meshB.fillAll(9)
+meshA.blanketVel(+1500.,axis=1)
+meshB.blanketVel(-1500.,axis=1)
+meshE = pss.combine_meshes(meshA,meshB,axis=1)
+meshE.top_and_tail()
+meshE.viewMats()
+meshE.save(fname='regolith_square.iSALE')
+
+meshA.fillAll(-1)
+meshB.fillAll(-1)
+
+r = 0.5
+
+r *= np.pi
+
+
+R = [[-1.,-1.],
+     [-1.,1.],
+     [1.,-1.],
+     [1.,-1.]]
+
+
+for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
+    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r*3)
+    grain1.place(xA,yA,mA,meshA)
+for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r)
+    grain2.place(xB,yB,mB,meshB)
+
+meshA.fillAll(9)
+meshB.fillAll(9)
+meshA.blanketVel(+1500.,axis=1)
+meshB.blanketVel(-1500.,axis=1)
+meshF = pss.combine_meshes(meshA,meshB,axis=1)
+meshF.top_and_tail()
+meshF.viewMats()
+meshF.save(fname='regolith_triangle.iSALE')
