@@ -40,12 +40,15 @@ def DD_(x):
 # Top and bottom mesh created separately
 meshA = pss.Mesh(X=500,Y=1200,cellsize=2.5e-6)
 meshB = pss.Mesh(X=500,Y=1200,cellsize=2.5e-6)
+meshA.label='A'
+meshB.label='B'
 
 # target volume (area) fraction
 vfrac = 0.5
 
 # Store grain objects in list, 'grains'
-grains = []
+grainsA = []
+grainsB = []
 
 # Minimum krubeim phi = min resolution (4 cppr)
 # Max ... '' '' '' '' = max resolution (200 cppr) 
@@ -66,37 +69,64 @@ h = abs(phi[1]-phi[0])*.5
 
 # target area that ALL particles should take up at end
 target_area = float(meshA.x*meshA.y*vfrac)
-
 for r,p in zip(Rs,phi):
     # generate grain object with radius r
-    g = pss.Grain(eqr=int(r))
+    gA = pss.Grain(eqr=int(r))
+    gB = pss.Grain(eqr=int(r))
     # calculate the target number of grains from CDF (see above)
     prob = abs(CDF(p+h) - CDF(p-h))
-    g.targetFreq = int(round(prob * (target_area/float(g.area))))
-    grains.append(g)
+    gA.targetFreq = int(round(prob * (target_area/float(gA.area))))
+    gB.targetFreq = int(round(prob * (target_area/float(gB.area))))
+    grainsA.append(gA)
+    grainsB.append(gB)
 
 # library of grains has been generated, now place them into the mesh! 
 # Just meshA for now
 
 # order grains from largest to smallest
-grains = [g for _,g in sorted(zip(phi,grains))]
+grainsA = [gA for _,gA in sorted(zip(phi,grainsA))]
+grainsB = [gB for _,gB in sorted(zip(phi,grainsB))]
 
 groupA = pss.Ensemble(meshA)
-
+groupB = pss.Ensemble(meshB)
+print "region A"
 try:
-    for g in grains:
-        for f in range(g.targetFreq):
-            g.insertRandomly(target=meshA, m=1)
-            groupA.add(g)
-        print np.sum(meshA.materials)/float(meshA.Ncells)
+    i = 0
+    for gA in grainsA:
+        for f in range(gA.targetFreq):
+            gA.insertRandomly(meshA, m=1)
+            groupA.add(gA,gA.x,gA.y)
+except KeyboardInterrupt:
+    pass
+
+print "region B"
+try:
+    i = 0
+    for gB in grainsB:
+        for f in range(gB.targetFreq):
+            gB.insertRandomly(meshB, m=1)
+            groupB.add(gB,gB.x,gB.y)
 except KeyboardInterrupt:
     pass
 
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
+groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
+
 
 meshA.fillAll(-1)
-for x,y,g,m in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
-    g.place(x,y,m,meshA)
+meshB.fillAll(-1)
+for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
+    gA.place(xA,yA,mA,meshA)
+for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+    gB.place(xB,yB,mB,meshB)
 
 meshA.fillAll(9)
-meshA.viewMats()
+meshB.fillAll(9)
+
+meshA.blanketVel(+1500.,axis=1)
+meshB.blanketVel(-1500.,axis=1)
+
+meshC = pss.combine_meshes(meshA,meshB,axis=1)
+meshC.top_and_tail()
+meshC.viewMats()
+meshC.save(fname='regolith_circles.iSALE')

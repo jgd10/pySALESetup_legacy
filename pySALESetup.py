@@ -11,6 +11,25 @@ def polygon_area(X,Y):
         A += (X[i-1]*Y[i]-X[i]*Y[i-1])*.5
     return abs(A)
 
+def combine_meshes(mesh1,mesh2,axis=0):
+    assert mesh1.cellsize == mesh2.cellsize, "ERROR: meshes use different cellsizes {} & {}".format(mesh1.cellsize,mesh2.cellsize)
+    if axis == 0: assert mesh1.y == mesh2.y, "ERROR: Horizontal merge; meshes must have same y; not {} & {}".format(mesh1.x,mesh2.x)
+    if axis == 1: assert mesh1.x == mesh2.x, "ERROR: Vertical merge; meshes must have same x; not {} & {}".format(mesh1.y,mesh2.y)
+    
+    if axis == 0: 
+        Xw = mesh1.x + mesh2.x
+        Yw = mesh1.y
+    if axis == 1: 
+        Yw = mesh1.y + mesh2.y
+        Xw = mesh1.x
+    New = Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False)
+    New.materials = np.concatenate((mesh1.materials,mesh2.materials),axis=1+axis)
+    New.mesh = np.concatenate((mesh1.mesh,mesh2.mesh),axis=axis)
+    New.VX = np.concatenate((mesh1.VX,mesh2.VX),axis=axis)
+    New.VY = np.concatenate((mesh1.VY,mesh2.VY),axis=axis)
+
+    return New
+
 def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,min_res=5):
     """
     This function generates a mesh0 from a text file containing a list of its vertices
@@ -211,10 +230,10 @@ class Grain:
         """
         self.Px,self.Py = np.shape(self.mesh)
         Px, Py = self.Px,self.Py
-        i_edge = x - Px/2
-        j_edge = y - Py/2
-        i_finl = x + Px/2
-        j_finl = y + Py/2
+        i_edge = int(x - Px/2.)
+        j_edge = int(y - Py/2.)
+        i_finl = int(x + Px/2.)
+        j_finl = int(y + Py/2.)
         # NB 'i' refers to the target mesh indices whereas 'I' refers to shape's mesh indices
         # if shape is 'sticking out' of target mesh it must be cropped appropriately
         # i_edge is the x=0 edge (i.e. left vertical wall)
@@ -322,6 +341,8 @@ class Grain:
         insert grain into bed in an unoccupied region of void. By default use whole mesh, alternatively
         choose coords from region bounded by xbounds = [xmin,xmax] and ybounds = [ymin,ymax]
         """
+        target.mesh = np.sum(target.materials,axis=0)
+        target.mesh[target.mesh>1.] = 1.
         box = None
         box = np.sum(target.materials,axis=0)
         if xbounds is None and ybounds is not None:
@@ -355,9 +376,9 @@ class Grain:
         if nospace:
             pass
         else:
-            self.x = x
-            self.y = y
-            self.mat = m
+            #self.x = x
+            #self.y = y
+            #self.mat = m
             self.place(x,y,m,target)
         return 
     def checkCoords(self,x,y,target,overlap_max=0.):                                                                        
@@ -392,7 +413,8 @@ class Grain:
         return nospace, overlapping_cells
 
     def insertRandomwalk(self,target,m,xbounds=None,ybounds=None):
-        # Not yet implemented
+        target.mesh = np.sum(target.materials,axis=0)
+        target.mesh[target.mesh>1.] = 1.
         box = None
         box = np.sum(target.materials,axis=0)
         XCELLMAX = target.x 
@@ -478,13 +500,15 @@ class Ensemble:
         self.yc = []
         self.mats = []
 
-    def add(self,particle):
+    def add(self,particle,x=None,y=None):
         self.grains.append(particle)
         self.number += 1
         self.rots.append(particle.angle)
         self.radii.append(particle.equiv_rad)
-        self.xc.append(particle.x)
-        self.yc.append(particle.y)
+        if x is None: x = particle.x
+        if y is None: y = particle.y
+        self.xc.append(x)
+        self.yc.append(y)
         self.mats.append(particle.mat)
         self.phi.append(-np.log2(particle.equiv_rad))
         self.areas.append(particle.area)
@@ -571,11 +595,10 @@ class Ensemble:
             D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             # Calculate the distances to the nearest particles
             ind = np.argsort(D)                                                          # Sort the particles into order of distance from the considered particle
             BXM = boxmat[ind]                                                            # Sort the materials into the corresponding order
-            #print boxmat
             DU  = np.unique(BXM[:M])                                                     # Only select the M closest particles
             if np.array_equal(DU, matsARR):                                              # If the unique elements in this array equate the array of 
                                                                                          # materials then all are taken
-                mm     = BXM[M]                                                                           
+                mm     = BXM[-1]                                                                           
                 MAT[i] = mm                                                              # Set the particle material to be of the one furthest from 
                                                                                          # the starting particle
             else:                                                                        # Else there is a material in mats that is NOT in DU
@@ -586,11 +609,10 @@ class Ensemble:
                 #materials[materials==-1*(i+1)] = mm
             i += 1                                                                       # Increment i
         self.mats = list(MAT.astype(int))
-        #print self.mats
         return 
     
 class Mesh:
-    def __init__(self,X=500,Y=500,mats=9,cellsize=2.e-6,mixed=False):
+    def __init__(self,X=500,Y=500,cellsize=2.e-6,mixed=False):
         self.x = X
         self.y = Y
         self.Ncells = X*Y
@@ -602,12 +624,12 @@ class Mesh:
         self.yi, self.xi = np.meshgrid(self.yc,self.xc)
         self.xx, self.yy = self.xi*cellsize,self.yi*cellsize
         self.mesh = np.zeros((X,Y))
-        self.materials = np.zeros((mats,X,Y))
+        self.materials = np.zeros((9,X,Y))
         self.VX = np.zeros((X,Y))
         self.VY = np.zeros((X,Y))
         self.cellsize = cellsize
-        self.NoMats = mats
-        self.mats = range(1,mats+1)
+        self.NoMats = 9
+        self.mats = range(1,9+1)
         self.mixed = mixed
 
     def checkVels(self):
@@ -650,14 +672,18 @@ class Mesh:
         fig = plt.figure()
         if self.x > self.y:
             subplotX, subplotY = 211, 212
+            orientation='horizontal'
         else:
             subplotX, subplotY = 121, 122
+            orientation='vertical'
         axX = fig.add_subplot(subplotX,aspect='equal')
         axY = fig.add_subplot(subplotY,aspect='equal')
-        axX.pcolormesh(self.xi,self.yi,self.VX, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VX))
-        axY.pcolormesh(self.xi,self.yi,self.VY, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
+        pvx = axX.pcolormesh(self.xi,self.yi,self.VX, cmap='PiYG',vmin=np.amin(self.VX),vmax=np.amax(self.VX))
+        pvy = axY.pcolormesh(self.xi,self.yi,self.VY, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
         axX.set_title('$V_x$')
         axY.set_title('$V_y$')
+        fig.colorbar(pvx,orientation=orientation,ax=axX)
+        fig.colorbar(pvy,orientation=orientation,ax=axY)
         for ax in [axX,axY]:
             ax.set_xlim(0,self.x)
             ax.set_ylim(0,self.y)
@@ -680,6 +706,30 @@ class Mesh:
         ax.set_ylabel('$y$ [cells]')
         if save: fig.savefig(fname,bbox_inches='tight',dpi=300)
         plt.show()
+
+    def top_and_tail(self,num=3,axis=1):
+        """
+        Sets top and bottom 3 rows/columns to void cells. Recommended when edges moving away from boundary
+        are porous. Prevents erroneous tension/densities.
+        """
+        if axis == 0:
+            self.materials[:,:num,:]  *= 0.
+            self.materials[:,-num:,:] *= 0.
+            self.mesh[:num,:]  *= 0.
+            self.mesh[-num:,:] *= 0.
+            self.VX[:num,:]  *= 0.
+            self.VX[-num:,:] *= 0.
+            self.VY[:num,:]  *= 0.
+            self.VY[-num:,:] *= 0.
+        elif axis == 1:
+            self.materials[:,:,:num]  *= 0.
+            self.materials[:,:,-num:] *= 0.
+            self.mesh[:,:num]  *= 0.
+            self.mesh[:,-num:] *= 0.
+            self.VX[:,:num]  *= 0.
+            self.VX[:,-num:] *= 0.
+            self.VY[:,:num]  *= 0.
+            self.VY[:,-num:] *= 0.
 
     def fillAll(self,m):
         """
@@ -730,6 +780,16 @@ class Mesh:
             temp_materials -= temp_2
             self.materials[m-1] += temp_materials
 
+    def blanketVel(self,vel,axis=0):
+        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
+        if axis == 0:
+            self.VX[:,:] = vel
+        elif axis == 1:
+            self.VY[:,:] = vel
+        elif axis == 2:
+            assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
+            self.VX[:,:] = vel[0]
+            self.VY[:,:] = vel[1]
     def plateVel(self,ymin,ymax,vel,axis=0):
         assert ymin<ymax, "ERROR: ymin must be greater than ymax!"
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
