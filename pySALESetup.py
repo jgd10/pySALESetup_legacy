@@ -780,7 +780,7 @@ class Mesh:
             temp_materials -= temp_2
             self.materials[m-1] += temp_materials
 
-    def multiplyVel(self,multiplier=.5,axis=1)
+    def multiplyVels(self,multiplier=.5,axis=1):
         """
         This function multiplies all velocities by a 'multiplier' factor.
         works on whole mesh.
@@ -850,7 +850,7 @@ class Mesh:
         return matrix_por*100.
 
 
-    def save(self,fname='meso_m.iSALE',noVel=False,info=False):
+    def save(self,fname='meso_m.iSALE',noVel=False,info=False,compress=False):
         """
         A function that saves the current mesh as a text file that can be read, verbatim into iSALE.
         This compiles the integer indices of each cell, as well as the material in them and the fraction
@@ -910,7 +910,7 @@ class Mesh:
             ALL  = np.column_stack((XI,YI,FRAC.transpose(),PI))                                              
         else:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))                                             
-        
+        if compress: fname += '.gz'
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
     
     def _checkFRACs(self,FRAC):
