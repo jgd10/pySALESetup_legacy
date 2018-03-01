@@ -780,6 +780,20 @@ class Mesh:
             temp_materials -= temp_2
             self.materials[m-1] += temp_materials
 
+    def multiplyVel(self,multiplier=.5,axis=1)
+        """
+        This function multiplies all velocities by a 'multiplier' factor.
+        works on whole mesh.
+        """
+        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
+        if axis == 0:
+            self.VX *= multiplier
+        elif axis == 1:
+            self.VY *= multiplier
+        elif axis == 2:
+            self.VX *= multiplier
+            self.VY *= multiplier
+
     def blanketVel(self,vel,axis=0):
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
         if axis == 0:
