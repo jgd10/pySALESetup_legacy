@@ -47,8 +47,7 @@ meshB.label='B'
 vfrac = 0.5
 
 # Store grain objects in list, 'grains'
-grainsA = []
-grainsB = []
+grains = []
 
 # Minimum krubeim phi = min resolution (4 cppr)
 # Max ... '' '' '' '' = max resolution (200 cppr) 
@@ -71,43 +70,33 @@ h = abs(phi[1]-phi[0])*.5
 target_area = float(meshA.x*meshA.y*vfrac)
 for r,p in zip(Rs,phi):
     # generate grain object with radius r
-    gA = pss.Grain(eqr=int(r))
-    gB = pss.Grain(eqr=int(r))
+    g = pss.Grain(eqr=int(r))
     # calculate the target number of grains from CDF (see above)
     prob = abs(CDF(p+h) - CDF(p-h))
-    gA.targetFreq = int(round(prob * (target_area/float(gA.area))))
-    gB.targetFreq = int(round(prob * (target_area/float(gB.area))))
-    grainsA.append(gA)
-    grainsB.append(gB)
+    g.targetFreq = int(round(prob * (target_area/float(g.area))))
+    grains.append(g)
 
 # library of grains has been generated, now place them into the mesh! 
 # Just meshA for now
 
 # order grains from largest to smallest
-grainsA = [gA for _,gA in sorted(zip(phi,grainsA))]
-grainsB = [gB for _,gB in sorted(zip(phi,grainsB))]
+grains = [g for _,g in sorted(zip(phi,grains))]
 
 groupA = pss.Ensemble(meshA)
 groupB = pss.Ensemble(meshB)
 print "region A"
 try:
     i = 0
-    for gA in grainsA:
-        for f in range(gA.targetFreq):
-            gA.insertRandomly(meshA, m=1)
-            groupA.add(gA,gA.x,gA.y)
+    for g in grains:
+        for f in range(g.targetFreq):
+            g.insertRandomly(meshA, m=1)
+            groupA.add(g,g.x,g.y)
+            g.insertRandomly(meshB, m=1)
+            groupB.add(g,g.x,g.y)
 except KeyboardInterrupt:
     pass
 
-print "region B"
-try:
-    i = 0
-    for gB in grainsB:
-        for f in range(gB.targetFreq):
-            gB.insertRandomly(meshB, m=1)
-            groupB.add(gB,gB.x,gB.y)
-except KeyboardInterrupt:
-    pass
+
 
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
@@ -115,8 +104,11 @@ groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 
 meshA.fillAll(-1)
 meshB.fillAll(-1)
+i = 0
 for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
+    i += 1
     gA.place(xA,yA,mA,meshA)
+
 for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
     gB.place(xB,yB,mB,meshB)
 
@@ -128,7 +120,7 @@ meshB.blanketVel(-1500.,axis=1)
 
 meshC = pss.combine_meshes(meshA,meshB,axis=1)
 meshC.top_and_tail()
-#meshC.viewMats()
+meshC.viewMats()
 meshC.save(fname='regolith_circles_v3000.iSALE',compress=True)
 meshC.multiplyVels()
 meshC.save(fname='regolith_circles_v1500.iSALE',compress=True)
@@ -164,7 +156,7 @@ meshA.blanketVel(+1500.,axis=1)
 meshB.blanketVel(-1500.,axis=1)
 meshD = pss.combine_meshes(meshA,meshB,axis=1)
 meshD.top_and_tail()
-#meshD.viewMats()
+meshD.viewMats()
 meshD.save(fname='regolith_tetrahedracritangle_v3000.iSALE',compress=True)
 meshD.multiplyVels()
 meshD.save(fname='regolith_tetrahedracritangle_v1500.iSALE',compress=True)
@@ -199,7 +191,7 @@ meshA.blanketVel(+1500.,axis=1)
 meshB.blanketVel(-1500.,axis=1)
 meshE = pss.combine_meshes(meshA,meshB,axis=1)
 meshE.top_and_tail()
-#meshE.viewMats()
+meshE.viewMats()
 meshE.save(fname='regolith_square_v3000.iSALE',compress=True)
 meshE.multiplyVels()
 meshE.save(fname='regolith_square_v1500.iSALE',compress=True)
@@ -233,7 +225,7 @@ meshA.blanketVel(+1500.,axis=1)
 meshB.blanketVel(-1500.,axis=1)
 meshF = pss.combine_meshes(meshA,meshB,axis=1)
 meshF.top_and_tail()
-#meshF.viewMats()
+meshF.viewMats()
 meshF.save(fname='regolith_triangle_v3000.iSALE',compress=True)
 meshF.multiplyVels()
 meshF.save(fname='regolith_triangle_v1500.iSALE',compress=True)

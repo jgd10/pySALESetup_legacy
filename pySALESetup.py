@@ -2,6 +2,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from collections import Counter
 
 def polygon_area(X,Y):
@@ -11,7 +12,10 @@ def polygon_area(X,Y):
         A += (X[i-1]*Y[i]-X[i]*Y[i-1])*.5
     return abs(A)
 
-def combine_meshes(mesh1,mesh2,axis=0):
+def combine_meshes(mesh2,mesh1,axis=1):
+    """
+    Combines two meshes into new Mesh instance; NB mesh2 will be on the 'bottom' and mesh1 on 'top'
+    """
     assert mesh1.cellsize == mesh2.cellsize, "ERROR: meshes use different cellsizes {} & {}".format(mesh1.cellsize,mesh2.cellsize)
     if axis == 0: assert mesh1.y == mesh2.y, "ERROR: Horizontal merge; meshes must have same y; not {} & {}".format(mesh1.x,mesh2.x)
     if axis == 1: assert mesh1.x == mesh2.x, "ERROR: Vertical merge; meshes must have same x; not {} & {}".format(mesh1.y,mesh2.y)
@@ -487,14 +491,14 @@ class Grain:
         return
 
 class Ensemble:
-    def __init__(self,host_mesh,grains=[],rots=[],radii=[],areas=[]):
+    def __init__(self,host_mesh):
         assert host_mesh is not None, "ERROR: ensemble must have a host mesh"
-        self.grains = grains
+        self.grains = []
         self.number = 0
-        self.rots   = rots
-        self.radii = [r*host_mesh.cellsize for r in radii]
-        self.areas = [a*host_mesh.cellsize**2. for a in areas]
-        self.phi = self._krumbein_phi()
+        self.rots   = []
+        self.radii = [] 
+        self.areas = []
+        self.phi = [] #self._krumbein_phi()
         self.host = host_mesh
         self.xc = []
         self.yc = []
@@ -678,17 +682,32 @@ class Mesh:
             orientation='vertical'
         axX = fig.add_subplot(subplotX,aspect='equal')
         axY = fig.add_subplot(subplotY,aspect='equal')
+
+        dividerX = make_axes_locatable(axX)
+        dividerY = make_axes_locatable(axY)
+        
         pvx = axX.pcolormesh(self.xi,self.yi,self.VX, cmap='PiYG',vmin=np.amin(self.VX),vmax=np.amax(self.VX))
         pvy = axY.pcolormesh(self.xi,self.yi,self.VY, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
+        
         axX.set_title('$V_x$')
         axY.set_title('$V_y$')
-        fig.colorbar(pvx,orientation=orientation,ax=axX)
-        fig.colorbar(pvy,orientation=orientation,ax=axY)
+
+        if orientation == 'horizontal':
+            caxX = dividerX.append_axes("bottom", size="5%", pad=0.5)
+            caxY = dividerY.append_axes("bottom", size="5%", pad=.5)
+        elif orientation == 'vertical':
+            caxX = dividerX.append_axes("right", size="5%", pad=0.05)
+            caxY = dividerY.append_axes("right", size="5%", pad=0.05)
+
+        cbX = fig.colorbar(pvx,orientation=orientation,ax=axX,cax=caxX)
+        cbY = fig.colorbar(pvy,orientation=orientation,ax=axY,cax=caxY)
         for ax in [axX,axY]:
             ax.set_xlim(0,self.x)
             ax.set_ylim(0,self.y)
             ax.set_xlabel('$x$ [cells]')
             ax.set_ylabel('$y$ [cells]')
+        cbX.set_label('ms$^{-1}$')
+        cbY.set_label('ms$^{-1}$')
         fig.tight_layout()
         if save: fig.savefig(fname,bbox_inches='tight',dpi=300)
         plt.show()
@@ -794,7 +813,7 @@ class Mesh:
             self.VX *= multiplier
             self.VY *= multiplier
 
-    def blanketVel(self,vel,axis=0):
+    def blanketVel(self,vel,axis=1):
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
         if axis == 0:
             self.VX[:,:] = vel
