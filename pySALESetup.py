@@ -6,6 +6,9 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from collections import Counter
 
 def polygon_area(X,Y):
+    """
+    Calculates the area of a polygon with vertices X = [x coords], Y = [y coords]
+    """
     N = np.size(X)
     A = 0
     for i in range(1,N):
@@ -14,7 +17,8 @@ def polygon_area(X,Y):
 
 def combine_meshes(mesh2,mesh1,axis=1):
     """
-    Combines two meshes into new Mesh instance; NB mesh2 will be on the 'bottom' and mesh1 on 'top'
+    Combines two mesh classes, wither horizontally or vertically and creates a new Mesh instance
+    for the result. Material fractions are carried over, as are velocities, and the 'mesh' param.
     """
     assert mesh1.cellsize == mesh2.cellsize, "ERROR: meshes use different cellsizes {} & {}".format(mesh1.cellsize,mesh2.cellsize)
     if axis == 0: assert mesh1.y == mesh2.y, "ERROR: Horizontal merge; meshes must have same y; not {} & {}".format(mesh1.x,mesh2.x)
@@ -182,7 +186,19 @@ def gen_ellipse(r_,a_,e_):
     return mesh0
 
 class Grain:
+    """
+    The Grain class. Instances can be created separate to a Mesh class and inserted at will. The main feature of Each instance
+    is the mesh. This is a mini-domain that contains all the cells that are filled or not. This constitutes the 'grain'. Other
+    properties are stored in relation to it such as the shape type, area, rotation, and 'equivalent radius'. Equivalent radius 
+    is the radius a circle of equal area would possess. This allows for easy relative scaling of grains which are different 
+    shapes.
+    """
     def __init__(self, eqr=10., rot=0., shape='circle', File=None, trng_coords=None, rect_coords=None, elps_params=None, poly_params=None, mixed=False):
+        """
+        When initialised the type of shape must be specified. Currently pySALESetup can handle N-sided polygons, 
+        circles and ellipses. Other shapes can be added if and when necessary (e.g. hybrids).
+        Mixed cells mode has not been fully tested yet.   
+        """
         self.equiv_rad = eqr
         self.angle = rot
         self.shape = shape
@@ -212,9 +228,12 @@ class Grain:
         # more to be added...
         self.Px,self.Py = np.shape(self.mesh)
     def view(self):
+        """ view the grain in a simple plot """
         fig = plt.figure()
         ax = fig.add_subplot(111,aspect='equal')
         ax.imshow(self.mesh,cmap='binary')
+        ax.set_xlabel('x [cells]')
+        ax.set_ylabel('y [cells]')
         fig.show()
         ax.cla()
         
@@ -342,8 +361,10 @@ class Grain:
 
     def insertRandomly(self,target,m,xbounds=None,ybounds=None):
         """
-        insert grain into bed in an unoccupied region of void. By default use whole mesh, alternatively
-        choose coords from region bounded by xbounds = [xmin,xmax] and ybounds = [ymin,ymax]
+        insert grain into bed in an empty space. By default select from whole mesh, 
+        alternatively, choose coords from region bounded by xbounds = [xmin,xmax] and 
+        ybounds = [ymin,ymax]. Position is defined by grain CENTRE
+        so overlap with box boundaries is allowed.
         """
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
@@ -417,6 +438,15 @@ class Grain:
         return nospace, overlapping_cells
 
     def insertRandomwalk(self,target,m,xbounds=None,ybounds=None):
+        """
+        Similar to insertRandomly. Randomly walk until allowed contact established and place
+        Initial coordinates taken from box and on a void cell
+        Move grain by random increments of equivalent radius in x and y
+        Once in contact with another grain 
+            (contact defined as 'overlaps by 100th the area of active grain')
+        place into mesh
+        If bounded by x/ybounds; do not allow motion outside of these.
+        """
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
         box = None
@@ -447,28 +477,26 @@ class Grain:
             XCELLMIN = int((xbounds[0]-np.amin(target.xx))/target.cellsize)
             YCELLMAX = int((ybounds[1]-np.amin(target.yy))/target.cellsize)
             YCELLMIN = int((ybounds[0]-np.amin(target.yy))/target.cellsize)
-        cell_limit = max(np.sum(self.area)/100.,1)                                                # Max number of overlapping cells should scale with area.
-        
-                                                                                                            # area ~= 110 cells for 6cppr
-                                                                                                            # Does NOT need to be integer since values in the mesh are floats, 
-                                                                                                            # and it is their sum that is calculated.
-        touching   = False                                                                                        # Initialise the indicators for this function
-        passes     = 1                                                                                        # here are 'passes' and 'counter' similar to check_coords_full
-        counter    = 0                                                                                        # But this time there is 'touching' which indicates
-                                                                                                            # contact between particles
+        # Max number of overlapping cells should scale with area.
+        cell_limit = max(np.sum(self.area)/100.,1)                                                
+        # area ~= 110 cells for 6cppr
+        # Does NOT need to be integer since values in the mesh are floats, 
+        # and it is their sum that is calculated.
+        touching   = False                                                                           
+        counter    = 0                                                                             
+                                                                                                     
         indices = np.where(box==0.)                                                          
-        indices = np.column_stack(indices)                                                                                                          
-        x,y   = random.choice(indices)                                                                
+        indices = np.column_stack(indices)                                                           
+        x,y   = random.choice(indices)                                                               
         end = False
         while not touching:    
             if x > XCELLMAX: x = XCELLMIN
             if x < XCELLMIN: x = XCELLMAX
             if y > YCELLMAX: y = YCELLMAX
-            if y < YCELLMIN: y = YCELLMIN                                                            # If the coord moves out of the mesh, wrap back around.
-            nospace, overlap = self.checkCoords(x,y,target,overlap_max=cell_limit)                                                          
-            counter += 1                                                                                  
+            if y < YCELLMIN: y = YCELLMIN                                                            
+            nospace, overlap = self.checkCoords(x,y,target,overlap_max=cell_limit)                   
+            counter += 1                                                                             
             if counter>100000:                                                                              
-                passes = 1                                                                                 
                 print "No coords found after {} iterations; exiting".format(counter)
                 break
         
@@ -487,10 +515,19 @@ class Grain:
             self.y = y
             self.mat = m
             self.place(x,y,m,target)
-                                                                                                            # place shape here.
         return
 
 class Ensemble:
+    """
+    Ensemble class. Essentially a class wherein can be stored information on grains 
+    In addition to storing the information of any grains added to it, it has some other
+    functions. None are more useful than optimise_materials, that will tell you the 
+    optimum material distribution (given a certain number) for grains in your ensemble.
+
+    This class was designed primarily to allow for multiple ensembles in the same domain
+    e.g. a bimodal particle bed; particles from two different materials. Ensemble classes
+    can store their information separately and optimise their materials separately.
+    """
     def __init__(self,host_mesh):
         assert host_mesh is not None, "ERROR: ensemble must have a host mesh"
         self.grains = []
@@ -505,6 +542,11 @@ class Ensemble:
         self.mats = []
 
     def add(self,particle,x=None,y=None):
+        """
+        Add a grain to the Ensemble. Allow x and y to be specified when adding because
+        grain may not be placed yet and have no value, for example. There are other, more
+        niche, reasons for this as well.
+        """
         self.grains.append(particle)
         self.number += 1
         self.rots.append(particle.angle)
@@ -518,6 +560,10 @@ class Ensemble:
         self.areas.append(particle.area)
 
     def _krumbein_phi(self):
+        """
+        Convert all radii in the ensemble to the Krumbein Phi, which is commonly used in 
+        particle size distributions.
+        """
         phi = []
         # Krumbein phi = -log_2(D/D0) where D0 = 1 mm and D = diameter
         for r in self.radii:
@@ -526,12 +572,22 @@ class Ensemble:
         return phi
 
     def _vfrac(self):
+        """
+        Calculate the area fraction the ensemble occupies in the domain
+        """
         self.vfrac = np.sum(self.areas)/self.host.area
 
     def print_vfrac(self):
+        """
+        Print out the area fraction; this is a user-accessible function
+        """
         print self._vfrac()
     
     def frequency(self):
+        """
+        Calculate the frequencies of each grain based on their size; must be called
+        after _krumbein_phi.
+        """
         self.frequencies = Counter(self.phi)
         self.areaFreq = Counter(self.areas)
 
@@ -616,7 +672,18 @@ class Ensemble:
         return 
     
 class Mesh:
+    """
+    This is the domain class and it tracks all materials placed into it. Main features
+    are the material fields--NB. of materials is ALWAYS 9 (the maximum). When saving,
+    if a material is not used it is not included in the output file--, the velocity fields
+    which include both x and y component fields, and the 'mesh' field. This acts like a test
+    domain with only one material field and is mostly used internally.
+    """
     def __init__(self,X=500,Y=500,cellsize=2.e-6,mixed=False):
+        """
+        Initialise the Mesh class. Defaults are typical for mesoscale setups which this module
+        was originally designed for.
+        """
         self.x = X
         self.y = Y
         self.Ncells = X*Y
@@ -637,6 +704,9 @@ class Mesh:
         self.mixed = mixed
 
     def checkVels(self):
+        """
+        Ensures no void cells have velocities.
+        """
         total = np.sum(self.materials,axis=0)
         # make sure that all void cells have no velocity
         self.VX[total==0.] = 0.
@@ -672,6 +742,9 @@ class Mesh:
         return maxdiff
 
     def viewVels(self,save=False,fname='vels.png'):
+        """
+        View velocities in a simple plot and save file if wanted.
+        """
         self.checkVels()
         fig = plt.figure()
         if self.x > self.y:
@@ -713,6 +786,9 @@ class Mesh:
         plt.show()
 
     def viewMats(self,save=False,fname='mats.png'):
+        """
+        View all material fields in a simple matpltolib plot
+        """
         fig = plt.figure()
         ax = fig.add_subplot(111,aspect='equal')
         for KK in range(self.NoMats):
@@ -753,7 +829,7 @@ class Mesh:
     def fillAll(self,m):
         """
         Fills entire mesh with material m. if m ==-1, it will fill it with void (essentially 
-        deleting all contents of the mesh). Otherwise existing material is prioritised. Equivalent to clear.
+        deleting all contents of the mesh). Otherwise existing material is prioritised.
         """
         if m == -1:
             # Erase all materials
@@ -814,6 +890,9 @@ class Mesh:
             self.VY *= multiplier
 
     def blanketVel(self,vel,axis=1):
+        """
+        Assign a blanket velocity to whole domain. Useful before merging meshes or when using other objects in iSALE.
+        """
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
         if axis == 0:
             self.VX[:,:] = vel
@@ -824,6 +903,9 @@ class Mesh:
             self.VX[:,:] = vel[0]
             self.VY[:,:] = vel[1]
     def plateVel(self,ymin,ymax,vel,axis=0):
+        """
+        Assign velocity in a plate shape; works both horizontally and vertically.
+        """
         assert ymin<ymax, "ERROR: ymin must be greater than ymax!"
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
         if axis == 0:
@@ -836,6 +918,9 @@ class Mesh:
             self.VY[(self.yy>=ymin)*(self.yy<=ymax)] = vel[1]
 
     def calcVol(self,m=None):
+        """
+        Calculate area of non-void in domain for material(s) m. 
+        """
         if m is None:
             Vol = np.sum(self.materials)
         elif type(m) == int:
@@ -849,6 +934,10 @@ class Mesh:
         return Vol
 
     def matrixPorosity(self,matrix,bulk,void=False,Print=True):
+        """
+        calculate sthe necessary matrix porosity to achieve a target bulk porosity
+        given current domain occupance.
+        """
         # bulk porosity must be taken as a percentage!
         bulk /= 100.
         matrix_vol = self.calcVol(matrix)
@@ -883,9 +972,11 @@ class Mesh:
         mixed   : Are mixed cells used?
         noVel   : Does not include velocities in meso_m.iSALE file
         info    : Include particle ID (i.e. #) as a column in the final file 
+        compress: compress the file? For large domains it is often necessary to avoid very large files; uses gz
         
         returns nothing but saves all the info as a txt file called 'fname' and populates the materials mesh.
         """
+        self.checkVels()
         ncells = self.x*self.y
         if info:
             OI    = np.zeros((ncells))
@@ -963,8 +1054,19 @@ class Mesh:
         
         return FRAC
         
-class Polygonal_object:
+class Apparatus:
+    """
+    Polygon object inserted into a Mesh instance. Example of apparatus
+    """
     def __init__(self,xcoords,ycoords,m,target):
+        """
+        This function fills all cells within a polygon defined by the vertices in arrays 
+        xcoords and ycoords
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ~if mat == -1. this fills the cells with VOID and overwrites everything.~
+        ~and additionally sets all velocities in those cells to zero            ~
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        """
         # last point MUST be identical to first; append to end if necessary
         if xcoords[0] != xcoords[-1]:
             xcoords = np.append(xcoords,xcoords[0])
@@ -974,14 +1076,6 @@ class Polygonal_object:
         self.hostmesh = target
         self.material = m
 
-        """
-        This function fills all cells within a polygon defined by the vertices in arrays 
-        xcoords and ycoords
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        ~if mat == -1. this fills the cells with VOID and overwrites everything.~
-        ~and additionally sets all velocities in those cells to zero            ~
-        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        """
         path = mpath.Path(np.column_stack((xcoords,ycoords)))
         # find the box that entirely encompasses the polygon
         L1 = np.amin(xcoords) 

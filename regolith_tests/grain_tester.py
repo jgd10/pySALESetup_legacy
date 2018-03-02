@@ -24,11 +24,13 @@ R = [[-1.,-1.],
 R[2][1] += off
 
 #grain = pss.Grain(shape='file',File='grain_arearatio-0.725.txt',eqr=20.,rot=r)
-grain1 = pss.Grain(shape='polygon',poly_params=R,eqr=20.,rot=r)
-grain2 = pss.Grain(shape='polygon',poly_params=R,eqr=20.,rot=r*3)
+#grain1 = pss.Grain(shape='polygon',poly_params=R,eqr=20.,rot=r)
+#grain2 = pss.Grain(shape='polygon',poly_params=R,eqr=20.,rot=r*3)
 
-grain1.place(x,yA,1,mesh1)
-grain2.place(x,yB,2,mesh1)
+grain = pss.Grain(shape='circle',eqr=20)
+
+grain.place(x,yA,1,mesh1)
+grain.place(x,yB,2,mesh1)
 
 fill = mesh1.calcVol([1,2])
 vfrac = fill/float(mesh1.Ncells)
@@ -45,5 +47,5 @@ mesh1.matrixPorosity(3,50.)
 mesh1.viewMats()
 #mesh1.viewVels()
 
-mesh1.save(fname='tetrahedra_farpoint_offset{:1.2f}.iSALE'.format(off))
+mesh1.save(fname='circle_base.iSALE',compress=True)
 
