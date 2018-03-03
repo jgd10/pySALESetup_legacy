@@ -1,0 +1,103 @@
+=========================================================================
+               _____         _      ______  _____      _               
+              / ____|  /\   | |    |  ____|/ ____|    | |              
+  _ __  _   _| (___   /  \  | |    | |__  | (___   ___| |_ _   _ _ __  
+ | '_ \| | | |\___ \ / /\ \ | |    |  __|  \___ \ / _ \ __| | | | '_ \ 
+ | |_) | |_| |____) / ____ \| |____| |____ ____) |  __/ |_| |_| | |_) |
+ | .__/ \__, |_____/_/    \_\______|______|_____/ \___|\__|\__,_| .__/ 
+ | |     __/ |                                                  | |    
+ |_|    |___/                                                   |_|   
+
+                    created by JGDerrick - 2018
+=========================================================================
+
+
+   ____     __              __         __  _         
+  /  _/__  / /________  ___/ /_ ______/ /_(_)__  ___ 
+ _/ // _ \/ __/ __/ _ \/ _  / // / __/ __/ / _ \/ _ \
+/___/_//_/\__/_/  \___/\_,_/\_,_/\__/\__/_/\___/_//_/
+-----------------------------------------------------
+
+pySALESetup (pss) is a simple python module designed to expand on iSALE2D's 
+setup routines and develop new flexibility and functionality.
+
+It was originally developed for mesoscale simulations, and this is its
+primary focus, however, there is nothing to stop it from working for 
+more typical impact simulation setups.
+
+This is a short guide designed to bring a user up to speed with its 
+general capabilities and how to begin using it.
+
+  _____    __  __  _             ______           __         ___   ________         __  ___        __     _______           
+ / ___/__ / /_/ /_(_)__  ___ _  / __/ /____ _____/ /____ ___/ (_) /_  __/ /  ___   /  |/  /__ ___ / /    / ___/ /__ ____ ___
+/ (_ / -_) __/ __/ / _ \/ _ `/ _\ \/ __/ _ `/ __/ __/ -_) _  /     / / / _ \/ -_) / /|_/ / -_|_-</ _ \  / /__/ / _ `(_-<(_-<
+\___/\__/\__/\__/_/_//_/\_, / /___/\__/\_,_/_/  \__/\__/\_,_(_)   /_/ /_//_/\__/ /_/  /_/\__/___/_//_/  \___/_/\_,_/___/___/
+-----------------------/___/------------------------------------------------------------------------------------------------
+
+At the core of pySALESetup is the Mesh class. This defines the domain 
+of your future simulation; its size and shape. This will be turned into
+the input file to be used with iSALE later on.
+
+The basic mesh is 500 x 500 cells with a GRIDSPACE (cellsize) of 2 um.
+These are all default parameters; you can specify your own if needed.
+
+Once created it has a number of useful features, but most are unneeded
+until material has been placed into it. It begins totally empty, 
+full of void.
+
+Placement functions include fillAll which will fill any available space
+with a material of your choice. Alternatively (and this is true of most
+placement functions in pss) you can set the material to -1 and it will
+insert void instead. Some functions will erase exisiting material when 
+this is done, however, BY DEFAULT pss gives priority to material ALREADY
+PRESENT.
+
+Once you are done with a mesh it can be saved using the save function.
+You can then wipe it, for example, and repopulate however you like.
+
+ ________         _____         _        _______           
+/_  __/ /  ___   / ___/______ _(_)__    / ___/ /__ ____ ___
+ / / / _ \/ -_) / (_ / __/ _ `/ / _ \  / /__/ / _ `(_-<(_-<
+/_/ /_//_/\__/  \___/_/  \_,_/_/_//_/  \___/_/\_,_/___/___/
+-----------------------------------------------------------
+
+The second class is the grain class. Each instance is a grain that can be placed
+into a mesh. Grain placement functions are methods of this class. Grains
+can be initialised as a variety of shapes; see docs for full details.
+
+Once created a grain is added to the mesh by a placement method. The main ones
+to use are 'place' which will insert the grain to a given material field
+at a given location. Alternatively it can be inserted randomly using 
+insertRandomly.
+
+If you want to keep track of which grain classes have been placed where you can!
+using...
+
+ ________         ____                   __   __      _______           
+/_  __/ /  ___   / __/__  ___ ___ __ _  / /  / /__   / ___/ /__ ____ ___
+ / / / _ \/ -_) / _// _ \(_-</ -_)  ' \/ _ \/ / -_) / /__/ / _ `(_-<(_-<
+/_/ /_//_/\__/ /___/_//_/___/\__/_/_/_/_.__/_/\__/  \___/_/\_,_/___/___/
+------------------------------------------------------------------------
+
+The third class. Essentially this can keep track of which grains have gone
+where by adding them to this class. E.g. if you have two sets of grains,
+one above the other, it would make sense to track their attributes in 
+two separate ensemble instances 'top' and 'bottom' say. top.xc would then
+return a list of all x-coords of grains in top or top.grains would return
+a list of all grain instances in top.
+
+However, the primary use of this class is for multiple optimisation of 
+materials. The optimise_materials function will return a list of what each 
+grain should be (material-wise) such that there are a minimum number of grains
+in contact with one another. It can be done separately for each ensemble.
+
+ ________         ___                           __             _______           
+/_  __/ /  ___   / _ | ___  ___  ___ ________ _/ /___ _____   / ___/ /__ ____ ___
+ / / / _ \/ -_) / __ |/ _ \/ _ \/ _ `/ __/ _ `/ __/ // (_-<  / /__/ / _ `(_-<(_-<
+/_/ /_//_/\__/ /_/ |_/ .__/ .__/\_,_/_/  \_,_/\__/\_,_/___/  \___/_/\_,_/___/___/
+--------------------/_/--/_/----------------------------------------------------- 
+
+Simple class, create an apparatus instance that can be placed into a mesh. E.g. 
+a target in the shape of a hollow box.                                                    
+
+work in progress.

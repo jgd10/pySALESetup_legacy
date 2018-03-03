@@ -1,3 +1,4 @@
 *.iSALE
-*.txt
-
+*.iSALE.gz
+*/pySALESetup.py
+*.pyc

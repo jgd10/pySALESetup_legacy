@@ -7,7 +7,13 @@ from collections import Counter
 
 def polygon_area(X,Y):
     """
-    Calculates the area of a polygon with vertices X = [x coords], Y = [y coords]
+    Returns exact area of a polygon
+    
+    Args:
+        X: [x coords] 
+        Y: [y coords]
+    Returns:
+        A: Scalar float
     """
     N = np.size(X)
     A = 0
@@ -17,8 +23,15 @@ def polygon_area(X,Y):
 
 def combine_meshes(mesh2,mesh1,axis=1):
     """
-    Combines two mesh classes, wither horizontally or vertically and creates a new Mesh instance
+    Combines two mesh classes, either horizontally or vertically and creates a new Mesh instance
     for the result. Material fractions are carried over, as are velocities, and the 'mesh' param.
+
+    Args:
+        mesh2: Mesh instance
+        mesh1: Mesh instance
+
+    Returns:
+        New: new Mesh instance
     """
     assert mesh1.cellsize == mesh2.cellsize, "ERROR: meshes use different cellsizes {} & {}".format(mesh1.cellsize,mesh2.cellsize)
     if axis == 0: assert mesh1.y == mesh2.y, "ERROR: Horizontal merge; meshes must have same y; not {} & {}".format(mesh1.x,mesh2.x)
@@ -52,14 +65,14 @@ def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=
     .   .
     and the last coordinate MUST be identical to the first. Additionally function will take
     an array R instead, of the same form.
-    --------------------------------------------------------------------------
-    |kwargs    |  Meaning                                                    | 
-    --------------------------------------------------------------------------
-    |mixed     |  partially filled cells on or off                           |
-    |rot       |  rotation of the grain (radians)                            |
-    |areascale |  Fraction between 0 and 1, indicates how to scale the grain |
-    |min_res   |  Minimum resolution allowed for a grain                     |
-    --------------------------------------------------------------------------
+
+    Args:
+        mixed:       logical; partially filled cells on or off                           
+        rot:         float; rotation of the grain (radians)                            
+        areascale:   float; Fraction between 0 and 1, indicates how to scale the grain 
+        min_res:     int; Minimum resolution allowed for a grain                     
+    Returns:
+        mesh_:       square array with filled cells, with value 1
 
     """
     # If no coords provided use filepath
@@ -137,9 +150,11 @@ def gen_circle(r_):
     Then assesses if the radius is less than that of the circle in question. If it 
     is, the cell is filled.
     
-    r_ : radius of the circle, origin is assumed to be the centre of the mesh0
-    
-    mesh0 and an AREA are returned
+    Args:
+        r_: radius of the circle, origin is assumed to be the centre of the mesh0
+
+    Returns:
+        mesh0: square array of floats
     """
     N = int(2.*r_+2.)
     mesh0 = np.zeros((N,N))
@@ -161,9 +176,12 @@ def gen_ellipse(r_,a_,e_):
     a rotation of a_ and an eccentricity of e_. It otherwise works on
     principles similar to those used in gen_circle.
     
-    r_ : the semi major axis (in cells)
-    a_ : the angle of rotation (in radians)
-    e_ : the eccentricity of the ellipse
+    Args:
+        r_ : int; the semi major axis (in cells)
+        a_ : float; the angle of rotation (in radians)
+        e_ : float; the eccentricity of the ellipse
+    Returns:
+        mesh0: square array of floats
     """
     N = int(2.*r_+2.)
     mesh0 = np.zeros((N,N))
@@ -187,17 +205,26 @@ def gen_ellipse(r_,a_,e_):
 
 class Grain:
     """
-    The Grain class. Instances can be created separate to a Mesh class and inserted at will. The main feature of Each instance
+    Instances can be created separate to a Mesh class and inserted at will. The main feature of Each instance
     is the mesh. This is a mini-domain that contains all the cells that are filled or not. This constitutes the 'grain'. Other
     properties are stored in relation to it such as the shape type, area, rotation, and 'equivalent radius'. Equivalent radius 
     is the radius a circle of equal area would possess. This allows for easy relative scaling of grains which are different 
     shapes.
     """
-    def __init__(self, eqr=10., rot=0., shape='circle', File=None, trng_coords=None, rect_coords=None, elps_params=None, poly_params=None, mixed=False):
+    def __init__(self, eqr=10., rot=0., shape='circle', File=None, elps_params=None, poly_params=None, mixed=False):
         """
         When initialised the type of shape must be specified. Currently pySALESetup can handle N-sided polygons, 
         circles and ellipses. Other shapes can be added if and when necessary (e.g. hybrids).
         Mixed cells mode has not been fully tested yet.   
+
+        Args:
+            eqr:         float; radius of a circle with the same area
+            rot:         float; angle to rotate the grain by.
+            shape:       string; label for the shape of the grain
+            File:        string; if file specified contains path to file
+            elps_params: list of floats; [major radius (cells), eccentricity]
+            poly_params: 2D list of floats; [[X0,Y0],[X1,Y1],...,[XN,YN]] coords of all vertices on a 2x2 grid -1 <= X,Y <= 1
+            mixed:       bool; mixed cells on or off
         """
         self.equiv_rad = eqr
         self.angle = rot
@@ -237,18 +264,18 @@ class Grain:
         fig.show()
         ax.cla()
         
-    def cropGrain(self,x,y,Px,Py,LX,LY):
+    def _cropGrain(self,x,y,LX,LY):
         """
-        If a grain is partially out of the mesh it needs to be cropped appropriately before 
-        a check is done or it is placed in. That is the purpose of this function.
-        x,y   : the coords of the grain placement (in cells)
-        Px,Py : shape of the grain's mini-mesh, in cells (the actual grain is not needed at this stage)
-        LX,LY : x-width and y-width (in cells) of the target mesh
-        _____________________________________________________________
-        returns
-        _____________________________________________________________
-        Is,Js : indices for the target mesh
-        i_,j_ : indices for the minimesh
+        If a grain is placed, such that it overlaps with the edge of the domain, the mesh 
+        and grain need to be 'cropped', such that the target mesh and grain mesh subsets match.
+        
+        Args:
+            x,y   : int; the coords of the grain placement (in cells)
+            LX,LY : int; x-width and y-width (in cells) of the target mesh
+
+        Returns:
+            Is,Js : list of ints; indices for the target mesh
+            i_,j_ : list of ints; indices for the minimesh
 
         """
         self.Px,self.Py = np.shape(self.mesh)
@@ -296,13 +323,13 @@ class Grain:
 
     def place(self,x,y,m,target,num=None):
         """
-        This function inserts the shape  into the
-        correct materials mesh at coordinate x, y.
+        Inserts the shape into the correct materials mesh at coordinate x, y.
         
-        x, y   : The x and y coords at which the shape is to be placed. (These are the shape's origin point)
-        m      : this is the index of the material
-        target : the target mesh, must be a 'Mesh' instance
-        num    : the 'number' of the particle.
+        Args:
+            x, y   : float; The x and y coords at which the shape is to be placed. (These are the shape's origin point)
+            m      : int; this is the index of the material
+            target : Mesh; the target mesh, must be a 'Mesh' instance
+            num    : int; the 'number' of the particle.
         
         existing material takes preference and is not displaced
 
@@ -324,7 +351,7 @@ class Grain:
             x = int(x/target.cellsize)
             y = int(y/target.cellsize)
         if type(m) == float or type(m) == np.float64: m = int(m)
-        Is,Js,i_,j_ = self.cropGrain(x,y,self.Px,self.Py,target.x,target.y)
+        Is,Js,i_,j_ = self._cropGrain(x,y,target.x,target.y)
         # slice ammunition grain for the target
         temp_shape = self.mesh[Is[0]:Is[1],Js[0]:Js[1]]  
         if self.mixed == False:
@@ -365,6 +392,12 @@ class Grain:
         alternatively, choose coords from region bounded by xbounds = [xmin,xmax] and 
         ybounds = [ymin,ymax]. Position is defined by grain CENTRE
         so overlap with box boundaries is allowed.
+
+        Args:
+            target: Mesh
+            m:      int; material number
+            xbounds: list
+            ybounds: list
         """
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
@@ -391,7 +424,7 @@ class Grain:
         indices = np.column_stack(indices)                                                                                                          
         while nospace:                                                                                 
             x,y   = random.choice(indices)                                                                
-            nospace, overlap = self.checkCoords(x,y,target)                                                          
+            nospace, overlap = self._checkCoords(x,y,target)                                                          
             counter += 1                                                                                  
             if counter>10000:                                                                              
                 nospace = True                                                                                
@@ -406,24 +439,29 @@ class Grain:
             #self.mat = m
             self.place(x,y,m,target)
         return 
-    def checkCoords(self,x,y,target,overlap_max=0.):                                                                        
+    def _checkCoords(self,x,y,target,overlap_max=0.):                                                                        
         """
-        This function checks if the grain will overlap with any other material;
+        Checks if the grain will overlap with any other material;
         and if it can be placed.
         
         It works by initially checking the location of the generated coords and 
         ammending them if the shape overlaps the edge of the mesh. Then the two arrays
         can be compared.
         
-        shape : the array based on mesh0 containg the shape
-        x     : The x coord of the shape's origin
-        y     : The equivalent y coord
-        
+        Args:
+            x:                 float; The x coord of the shape's origin
+            y:                 float; The equivalent y coord
+            target:            Mesh; 
+            overlap_max:       float; maximum number of overlapping cells allowed
+        Returns:
+            nospace:           boolean;
+            overlapping_cells: float; number of cells that overlap with other grains
+
         the value of nospace is returned. False is a failure, True is success.
         """
         #cell_limit = (np.pi*float(cppr_max)**2.)/100.                                                
         nospace = False                                                                                    
-        Is,Js,i_,j_ = self.cropGrain(x,y,self.Px,self.Py,target.x,target.y)
+        Is,Js,i_,j_ = self._cropGrain(x,y,target.x,target.y)
         
         temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])                                    
         temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])                                            
@@ -446,6 +484,12 @@ class Grain:
             (contact defined as 'overlaps by 100th the area of active grain')
         place into mesh
         If bounded by x/ybounds; do not allow motion outside of these.
+        
+        Args:
+            target:  Mesh
+            m:       int; material number
+            xbounds: list
+            ybounds: list
         """
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
@@ -494,7 +538,7 @@ class Grain:
             if x < XCELLMIN: x = XCELLMAX
             if y > YCELLMAX: y = YCELLMAX
             if y < YCELLMIN: y = YCELLMIN                                                            
-            nospace, overlap = self.checkCoords(x,y,target,overlap_max=cell_limit)                   
+            nospace, overlap = self._checkCoords(x,y,target,overlap_max=cell_limit)                   
             counter += 1                                                                             
             if counter>100000:                                                                              
                 print "No coords found after {} iterations; exiting".format(counter)
@@ -519,7 +563,7 @@ class Grain:
 
 class Ensemble:
     """
-    Ensemble class. Essentially a class wherein can be stored information on grains 
+    A class wherein can be stored information on grains 
     In addition to storing the information of any grains added to it, it has some other
     functions. None are more useful than optimise_materials, that will tell you the 
     optimum material distribution (given a certain number) for grains in your ensemble.
@@ -529,6 +573,10 @@ class Ensemble:
     can store their information separately and optimise their materials separately.
     """
     def __init__(self,host_mesh):
+        """
+        Args:
+            host_mesh: Mesh
+        """
         assert host_mesh is not None, "ERROR: ensemble must have a host mesh"
         self.grains = []
         self.number = 0
@@ -546,6 +594,11 @@ class Ensemble:
         Add a grain to the Ensemble. Allow x and y to be specified when adding because
         grain may not be placed yet and have no value, for example. There are other, more
         niche, reasons for this as well.
+
+        Args:
+            particle: Grain
+            x:        float
+            y:        float
         """
         self.grains.append(particle)
         self.number += 1
@@ -585,9 +638,9 @@ class Ensemble:
     
     def frequency(self):
         """
-        Calculate the frequencies of each grain based on their size; must be called
-        after _krumbein_phi.
+        Calculate the frequencies of each grain based on their size.
         """
+        self._krumbein_phi()
         self.frequencies = Counter(self.phi)
         self.areaFreq = Counter(self.areas)
 
@@ -622,12 +675,11 @@ class Ensemble:
     
         Continue until all the particles are assigned.
         
-        mats : array containing all the material numbers to be assigned
-        xc   : All the x coords of each particle centre. (array)
-        yc   :  "   "  y  "     "   "      "       "   . (array)
-        r    :  "   "  radii    "   "      "    . (array)
+        Args:
+            mats: array; containing all the material numbers to be assigned
     
-        Returns array 'MAT' containg an optimal material number for each grain
+        Returns:
+            MAT:  array; containg an optimal material number for each grain
         """
         N    = self.number                                                               # No. of particles
         M    = len(mats)
@@ -683,6 +735,12 @@ class Mesh:
         """
         Initialise the Mesh class. Defaults are typical for mesoscale setups which this module
         was originally designed for.
+
+        Args:
+            X:        int
+            Y:        int
+            cellsize: float; equivalent to GRIDSPC in iSALE
+            mixed:    bool
         """
         self.x = X
         self.y = Y
@@ -1011,7 +1069,7 @@ class Mesh:
                 K += 1
         FRAC = self._checkFRACs(FRAC)
         HEAD = '{},{}'.format(K,NM)
-        print HEAD
+        #print HEAD
         if noVel:
             ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
         elif info:
@@ -1117,3 +1175,11 @@ class Apparatus:
             temp_materials -= temp_2
             target.materials[int(m)-1,x_suc,y_suc] += temp_materials
 
+print " ============================================= "
+print "                _  _     _  _                  "
+print "         _     /_`/_//  /_`/_`_ _/_   _        "
+print "        /_//_/._// //_,/_,._//_'/ /_//_/       "
+print "       /   _/                       /          "
+print "                                               "
+print "                              by J. G. Derrick "
+print " ============================================= "
