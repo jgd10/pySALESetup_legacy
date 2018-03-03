@@ -233,6 +233,7 @@ class Grain:
         self.hostmesh = None
         self.mat = None
         if self.shape == 'circle' or self.shape =='sphere':
+            self.shape = 'circle'
             self.radius = self.equiv_rad
             self.mesh = gen_circle(self.equiv_rad)
             self.area = np.sum(self.mesh)
@@ -572,22 +573,23 @@ class Ensemble:
     e.g. a bimodal particle bed; particles from two different materials. Ensemble classes
     can store their information separately and optimise their materials separately.
     """
-    def __init__(self,host_mesh):
+    def __init__(self,hostmesh):
         """
         Args:
             host_mesh: Mesh
         """
-        assert host_mesh is not None, "ERROR: ensemble must have a host mesh"
+        assert hostmesh is not None, "ERROR: ensemble must have a host mesh"
         self.grains = []
         self.number = 0
         self.rots   = []
         self.radii = [] 
         self.areas = []
         self.phi = [] #self._krumbein_phi()
-        self.host = host_mesh
+        self.hostmesh = hostmesh
         self.xc = []
         self.yc = []
         self.mats = []
+        self.shapes = []
 
     def add(self,particle,x=None,y=None):
         """
@@ -611,6 +613,7 @@ class Ensemble:
         self.mats.append(particle.mat)
         self.phi.append(-np.log2(particle.equiv_rad))
         self.areas.append(particle.area)
+        self.shapes.append(particle.shape)
 
     def _krumbein_phi(self):
         """
@@ -628,7 +631,7 @@ class Ensemble:
         """
         Calculate the area fraction the ensemble occupies in the domain
         """
-        self.vfrac = np.sum(self.areas)/self.host.area
+        self.vfrac = np.sum(self.areas)/self.hostmesharea
 
     def print_vfrac(self):
         """
@@ -645,7 +648,7 @@ class Ensemble:
         self.areaFreq = Counter(self.areas)
 
     def area_weights():
-        ensemble_area = _vfrac()*self.host.area
+        ensemble_area = _vfrac()*self.hostmesh.area
         self.area_weights = [100.*a/ensemble_area for a in self.areas]
     
     def optimise_materials(self,mats=np.array([1,2,3,4,5,6,7,8,9])):                        
@@ -683,7 +686,7 @@ class Ensemble:
         """
         N    = self.number                                                               # No. of particles
         M    = len(mats)
-        L    = self.host.cellsize                                                        # Length of one cell
+        L    = self.hostmesh.cellsize                                                        # Length of one cell
         assert type(mats)==np.ndarray,"ERROR: material list must be a numpy array!"
         matsARR = np.array(mats)
         MAT  = np.array(self.mats)                                                       # Array for all material numbers of all particles
@@ -722,6 +725,79 @@ class Ensemble:
             i += 1                                                                       # Increment i
         self.mats = list(MAT.astype(int))
         return 
+
+    def fabricTensor_discs(self,tolerance=0.):
+        """
+        Calculates the fabric tensor of an Ensemble consisting of
+        perfectly circular disks. They do NOT have to be identical in size!
+
+        N.B. a tolerance is needed because circles are pixellated in iSALE (standard in 
+        eulerian codes). A tolerance should be chosen to ensure the result is accurate;
+        typically the cellsize or diagonal length of a cell is a good value.
+    
+        Args:
+    
+        tolerance: float; (see N.B. above)
+    
+        output:
+    
+            Z: The coordination number (average number of contacts/grain)
+            A: The fabric Anisotropy
+            F: The fabric tensor
+        """
+        # convert all radii and coords to arrays to aid the function
+        a  = np.array(self.radii).astype(np.float64)
+        a *= self.hostmesh.cellsize
+        ic = np.array(self.xc)
+        jc = np.array(self.yc)
+        for shp in self.shapes:
+            assert shp == 'circle', "ERROR: ALL grain shaps in an ensemble MUST be circles for this function to give an accurate answer"
+        # simple function to compute all possible differences between elements in an array
+        def difference_matrix(a):
+            x = np.reshape(a, (len(a), 1))
+            return x - x.transpose()
+        # This function similarly finds all possible combinations of elements in an array.
+        def addition_matrix(a):
+            x = np.reshape(a, (len(a), 1))
+            return x + x.transpose()
+    
+        # Number of particles
+        Np = self.number
+        # two arrays; one with all possible x-distances bewteen particles (li)
+        # one with all possible y-distances (lj)
+        # NB each has a shape of Np x Np and the matrices are 'flipped' sign-wise along the diagonal
+        # and the diagonals are zeros
+        li = difference_matrix(ic)
+        lj = difference_matrix(jc)
+        # s is all possible combinations of radii in the same order. i.e. 
+        # elements of s are the minimum corresponding distances required for a 'contact'
+        # Add a tolerance because we are not necessarily working with perfect circles, there is 
+        # an uncertainty on the minimum length required for a contact 
+        s  = addition_matrix(a) + tolerance
+        # The magnitude (length) of each branch vector is
+        L  = np.sqrt(li**2. + lj**2.)
+        L[L==0] = 1.
+        # normalise all branch vectors
+        li /= L 
+        lj /= L
+        # set all branch vectors that are not contacts equal to 9999.
+        li[L>=s] = 9999.
+        lj[L>=s] = 9999.
+        # Remove any branches of zero length (impossibilities) and flatten the arrays
+        # NB every contact appears twice in each array!! Each has a size of 2*Nc (No. contacts)
+        ni = li[li!=9999.]
+        nj = lj[lj!=9999.]
+        
+        F = np.zeros((2,2))
+        F[0,0] = np.sum(ni**2.)/float(Np)
+        F[1,1] = np.sum(nj**2.)/float(Np)
+        
+        F[0,1] = np.sum(ni*nj)/float(Np)
+        F[1,0] = F[0,1]
+    
+        Z = F[0,0] + F[1,1]
+        A = F[0,0] - F[1,1]
+        return Z, A, F
     
 class Mesh:
     """

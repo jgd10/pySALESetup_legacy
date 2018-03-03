@@ -84,7 +84,6 @@ grains = [g for _,g in sorted(zip(phi,grains))]
 
 groupA = pss.Ensemble(meshA)
 groupB = pss.Ensemble(meshB)
-print "region A"
 try:
     i = 0
     for g in grains:
@@ -97,6 +96,7 @@ except KeyboardInterrupt:
     pass
 
 
+print groupA.fabricTensor_discs()
 
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
@@ -104,12 +104,9 @@ groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 
 meshA.fillAll(-1)
 meshB.fillAll(-1)
-i = 0
-for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
-    i += 1
-    gA.place(xA,yA,mA,meshA)
 
-for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+for xA,yA,gA,mA,xB,yB,gB,mB in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats,groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+    gA.place(xA,yA,mA,meshA)
     gB.place(xB,yB,mB,meshB)
 
 meshA.fillAll(9)
