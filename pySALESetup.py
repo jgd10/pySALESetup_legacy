@@ -1283,7 +1283,8 @@ class Apparatus:
         """
         # last point MUST be identical to first; append to end if necessary
         assert len(xcoords)==len(ycoords), "ERROR: xcoords and ycoords must have same length!"
-        if xcoords[0] != xcoords[-1]:
+
+        if xcoords[0] != xcoords[-1] or ycoords[0] != ycoords[-1]:
             xcoords = np.append(xcoords,xcoords[0])
             ycoords = np.append(ycoords,ycoords[0])
         self.x = xcoords
@@ -1380,7 +1381,7 @@ class Apparatus:
             temp_materials[inrectangle*(np.sum(target.materials,axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
             temp_2 = np.sum(target.materials,axis=0)*temp_materials
             temp_materials -= temp_2
-            target.materials[int(mat)-1] += temp_materials
+            target.materials[int(m)-1] += temp_materials
         return
 
 
