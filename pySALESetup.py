@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from collections import Counter
+from PIL import Image
 
 def polygon_area(X,Y):
     """
@@ -50,6 +51,40 @@ def combine_meshes(mesh2,mesh1,axis=1):
     New.VY = np.concatenate((mesh1.VY,mesh2.VY),axis=axis)
 
     return New
+
+def MeshfromBMP(imname,cellsize=2.e-6):
+    """
+    Function that populates a Mesh instance from a bitmap, or similar.
+    When opened by PIL the result MUST be convertible to a 2D array of
+    grayscale values (0-255).
+
+    Different shades are treated as different materials, however, white is ignored
+    and treated as 'VOID'.
+
+    Args:
+        A: 2D array of grayscale integer; black - white values (0 - 255)
+        cellsize: float; equivalent to GRIDSPC, size of each cell
+    """
+    im = Image.open(imname)
+    
+    B = np.asarray(im)
+    A = np.copy(B)
+    A = np.rot90(A,k=3)
+    
+    
+    nx, ny = np.shape(A)
+    #white is considered 'VOID' and should not be included
+    ms = np.unique(A[A!=255])    
+    Nms = np.size(ms)
+    assert Nms <= 9, "ERROR: More than 9 different shades present (apart from white = void)"
+    mesh = Mesh(nx,ny,cellsize=cellsize)
+    
+    m = 0
+    for c in ms:
+        mesh.materials[m][A==c] = 1.
+        m += 1
+    
+    return mesh
 
 def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,min_res=5):
     """
@@ -142,6 +177,8 @@ def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=
                         if in_shape2: mesh_[i,j] += .01
 
     return mesh_
+
+
 
 def gen_circle(r_):
     """
@@ -1192,64 +1229,116 @@ class Apparatus:
     """
     Polygon object inserted into a Mesh instance. Example of apparatus
     """
-    def __init__(self,xcoords,ycoords,m,target):
+    def __init__(self,xcoords,ycoords):
         """
         This function fills all cells within a polygon defined by the vertices in arrays 
-        xcoords and ycoords
+        xcoords and ycoords; coords MUST be in clockwise order!
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         ~if mat == -1. this fills the cells with VOID and overwrites everything.~
         ~and additionally sets all velocities in those cells to zero            ~
         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         """
         # last point MUST be identical to first; append to end if necessary
+        assert len(xcoords)==len(ycoords), "ERROR: xcoords and ycoords must have same length!"
         if xcoords[0] != xcoords[-1]:
             xcoords = np.append(xcoords,xcoords[0])
             ycoords = np.append(ycoords,ycoords[0])
         self.x = xcoords
         self.y = ycoords
-        self.hostmesh = target
-        self.material = m
 
-        path = mpath.Path(np.column_stack((xcoords,ycoords)))
         # find the box that entirely encompasses the polygon
-        L1 = np.amin(xcoords) 
-        L2 = np.amax(xcoords)
-        T1 = np.amin(ycoords)
-        T2 = np.amax(ycoords)
+        self.L = np.array([np.amin(xcoords),np.amax(xcoords)])
+        self.T = np.array([np.amin(ycoords),np.amax(ycoords)])
+
+    def rotate(self, angle):
+        ct    = np.cos(angle)
+        st    = np.sin(angle)
+        self.x = self.x*ct - self.y*st
+        self.y = self.x*st + self.y*ct
+
         
-        # find the coordinates of every point in that box
-        Xc_TEMP = XX[(target.xc<=L2)*(target.xc>=L1)*(target.yc<=T2)*(target.yc>=T1)]
-        Yc_TEMP = YY[(target.xc<=L2)*(target.xc>=L1)*(target.yc<=T2)*(target.yc>=T1)]
+    def place(self,target,m):
+        """
+        inserts the object into the target mesh using the coords stored in Apparatus instance.
+        Preference is given to materials already present in the target mesh and these are not overwritten
+        if m == -1 then this erases all material it is placed on.
 
-        # store all indices of each coord that is in the polygon in two arrays
-        x_success = np.ones_like(Xc_TEMP,dtype=int)*-9999
-        y_success = np.ones_like(Yc_TEMP,dtype=int)*-9999
+        Args:
+            target: Mesh
+            m:      int; material number, -1 == void
+        """
 
-        # cycle through all these points
-        # store successes in arrays
-        k = 0
-        for x, y in zip(Xc_TEMP,Yc_TEMP):
-            in_shape = path.contains_point([x,y])
-            if in_shape:
-                x_success[k]   = np.where((XX==x)*(YY==y))[0][0] 
-                y_success[k]   = np.where((XX==x)*(YY==y))[1][0]
-                k += 1
-        x_suc = x_success[x_success!=-9999] 
-        y_suc = y_success[y_success!=-9999] 
-
-        if m == -1:
-            # select the necessary material using new arrays of indices
-            for mm in range(target.NoMats):
-               materials[mm][x_suc,y_suc] *= 0.
-            target.VX[x_suc,y_suc] *= 0.
-            target.VY[x_suc,y_suc] *= 0.
-            target.mesh[x_suc,y_suc] *= 0.
+        if len(self.x) == 5 and len(np.unique(self.x)) == 2 and len(np.unique(self.y)) == 2:
+            self._place_rectangle(target,m)
         else:
-            temp_materials = np.copy(target.materials[int(m)-1,x_suc,y_suc])
-            temp_materials[(np.sum(target.materials[:,x_suc,y_suc],axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
-            temp_2 = np.sum(target.materials[:,x_suc,y_suc],axis=0)*temp_materials
+            self.path = mpath.Path(np.column_stack((self.x,self.y)))
+            inbox_condition = (target.yy<=self.L[1])*(target.yy>=self.L[0])*(target.xx<=self.T[1])*(target.xx>=self.T[0])
+            Xc_TEMP = target.xx[inbox_condition]
+            Yc_TEMP = target.yy[inbox_condition]
+
+            # store all indices of each coord that is in the polygon in two arrays
+            x_success = np.ones_like(Xc_TEMP,dtype=int)*-9999
+            y_success = np.ones_like(Yc_TEMP,dtype=int)*-9999
+
+            # cycle through all these points
+            # store successes in arrays
+            k = 0
+            for x, y in zip(Xc_TEMP,Yc_TEMP):
+                in_shape = self.path.contains_point([x,y])
+                if in_shape:
+                    x_success[k] = np.where((target.xx==x)*(target.yy==y))[0][0] 
+                    y_success[k] = np.where((target.xx==x)*(target.yy==y))[1][0]
+                    k += 1
+            x_suc = x_success[x_success!=-9999] 
+            y_suc = y_success[y_success!=-9999] 
+
+            if m == -1:
+                # select the necessary material using new arrays of indices
+                for mm in range(target.NoMats):
+                   materials[mm][x_suc,y_suc] *= 0.
+                target.VX[x_suc,y_suc] *= 0.
+                target.VY[x_suc,y_suc] *= 0.
+                target.mesh[x_suc,y_suc] *= 0.
+            else:
+                temp_materials = np.copy(target.materials[int(m)-1,x_suc,y_suc])
+                temp_materials[(np.sum(target.materials[:,x_suc,y_suc],axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
+                temp_2 = np.sum(target.materials[:,x_suc,y_suc],axis=0)*temp_materials
+                temp_materials -= temp_2
+                target.materials[int(m)-1,x_suc,y_suc] += temp_materials
+            return
+    
+    def _place_rectangle(self,target,m):
+        """
+        places a rectangle of material in the target at provided coords 
+        if mat == -1. this fills the cells with VOID and overwrites everything.
+        and additionally sets all velocities in those cells to zero            
+        Should only be called if self.place() is placing an unrotated rectangle;
+        this method is significantly faster than the default and rectangles are very
+        common.
+        
+        Args:
+            target: Mesh
+            m:      int; material number, -1 == void
+        """
+        X1 = np.amin(self.x)
+        X2 = np.amax(self.x)
+        
+        Y1 = np.amin(self.y)
+        Y2 = np.amax(self.y)
+        
+        inrectangle = (target.xx<=X2)*(target.xx>=X1)*(target.yy<=Y2)*(target.yy>=Y1)
+        if m == -1:
+            for mm in range(9):
+                materials[mm][inrectangle] *= 0.
+            target.VX[inrectangle] *= 0.
+            target.VY[inrectangle] *= 0.
+        else:
+            temp_materials = np.copy(target.materials[int(m)-1])
+            temp_materials[inrectangle*(np.sum(target.materials,axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
+            temp_2 = np.sum(target.materials,axis=0)*temp_materials
             temp_materials -= temp_2
-            target.materials[int(m)-1,x_suc,y_suc] += temp_materials
+            target.materials[int(mat)-1] += temp_materials
+        return
 
 
 print " ===================================================== "
