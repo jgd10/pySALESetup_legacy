@@ -1,5 +1,10 @@
 import pySALESetup as pss
 
-mesh = pss.MeshfromBMP('example.bmp')
+mesh1 = pss.MeshfromBMP('example.bmp')
 
-mesh.viewMats()
+mesh1.viewMats()
+
+mesh2 = pss.MeshfromPSSFILE()
+
+mesh2.viewMats()
+mesh2.viewVels()

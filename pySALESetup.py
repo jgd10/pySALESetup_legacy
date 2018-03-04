@@ -52,6 +52,47 @@ def combine_meshes(mesh2,mesh1,axis=1):
 
     return New
 
+def MeshfromPSSFILE(fname='meso_m.iSALE.gz',cellsize=2.e-6,NumMats=9):
+    """
+    Generate a Mesh instance from an existing meso output file. NB NumMats
+    MUST be set explicitly because the function does not have the capbility 
+    to read from file yet.
+
+    Args: 
+        fname: string
+        cellsize: float
+        NumMats: int
+    """
+    # import all fields from input file, NB coords must be int
+    # in numpy genfromtxt & loadtxt handle .gz files implicitly
+    CellInd = np.genfromtxt(fname,skip_header=1,usecols=(0,1)).astype(int)
+    CellVel = np.genfromtxt(fname,skip_header=1,usecols=(2,3))
+    # No. mats not necessarily 9, so use string to specify how many cols
+    matcols = range(4,4+NumMats) 
+    CellMat = np.genfromtxt(fname,skip_header=1,usecols=(matcols))
+    
+    # Extract mesh size from index cols. Indices start at 0, so want + 1
+    # for actual size
+    nx = int(np.amax(CellInd[:,1])+1)
+    ny = int(np.amax(CellInd[:,0])+1)
+    
+    # Create the mesh instance & use cellsize as not stored in input file!!
+    mesh = Mesh(X=nx,Y=ny,cellsize=cellsize)
+
+    # initialise a counter (k) and cycle through all coords
+    k = 0
+    for j,i in CellInd:
+        # At each coordinate cycle through all the materials and assign to mesh
+        for m in range(NumMats):
+            mesh.materials[m,i,j] = CellMat[k,m]
+        # additionally assign each velocity as needed
+        mesh.VX[i,j] = CellVel[k,0]
+        mesh.VY[i,j] = CellVel[k,1]
+        # increment counter
+        k += 1
+    # return Mesh instance at end
+    return mesh
+
 def MeshfromBMP(imname,cellsize=2.e-6):
     """
     Function that populates a Mesh instance from a bitmap, or similar.
@@ -64,6 +105,8 @@ def MeshfromBMP(imname,cellsize=2.e-6):
     Args:
         A: 2D array of grayscale integer; black - white values (0 - 255)
         cellsize: float; equivalent to GRIDSPC, size of each cell
+    Returns:
+        mesh: Mesh
     """
     im = Image.open(imname)
     
@@ -86,7 +129,7 @@ def MeshfromBMP(imname,cellsize=2.e-6):
     
     return mesh
 
-def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,min_res=5):
+def grainfromVertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,min_res=5):
     """
     This function generates a mesh0 from a text file containing a list of its vertices
     in normalised coordinates over a square grid of dimensions 1 x 1. Centre = (0,0)
@@ -180,7 +223,7 @@ def gen_shape_fromvertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=
 
 
 
-def gen_circle(r_):
+def grainfromCircle(r_):
     """
     This function generates a circle within the base mesh0. It very simply converts
     each point to a radial coordinate from the origin (the centre of the shape.
@@ -207,11 +250,11 @@ def gen_circle(r_):
                 mesh0[j,i] = 1.0                                                                        
     return mesh0
 
-def gen_ellipse(r_,a_,e_):
+def grainfromEllipse(r_,a_,e_):
     """
     This function generates an ellipse in mesh0. It uses a semi-major axis of r_
     a rotation of a_ and an eccentricity of e_. It otherwise works on
-    principles similar to those used in gen_circle.
+    principles similar to those used in grainfromEllipse
     
     Args:
         r_ : int; the semi major axis (in cells)
@@ -272,21 +315,21 @@ class Grain:
         if self.shape == 'circle' or self.shape =='sphere':
             self.shape = 'circle'
             self.radius = self.equiv_rad
-            self.mesh = gen_circle(self.equiv_rad)
+            self.mesh = grainfromCircle(self.equiv_rad)
             self.area = np.sum(self.mesh)
         elif self.shape == 'file':
             assert File is not None, "No file path provided to create grain"
-            self.mesh = gen_shape_fromvertices(fname=File,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=self.angle)
+            self.mesh = grainfromVertices(fname=File,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=self.angle)
             self.area = np.sum(self.mesh)
         elif self.shape == 'ellipse':
             assert len(elps_params) == 2, "ERROR: ellipse creation requires elps_params to be of the form [major radius, eccentricity]"
-            self.mesh = gen_ellipse(elps_params[0],self.angle,elps_params[1])
+            self.mesh = grainfromEllipse(elps_params[0],self.angle,elps_params[1])
             self.area = np.sum(self.mesh)
             self.eccentricity = elps_params[1]
             self.radius = elps_params[0]
         elif self.shape == 'polygon':
             assert len(poly_params) >= 3, "ERROR: Polygon creation requires at least 3 unique coordinates"
-            self.mesh = gen_shape_fromvertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
+            self.mesh = grainfromVertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
             self.area = np.sum(self.mesh)
         else:
             print "ERROR: unsupported string -- {} --  used for shape.".format(self.shape)

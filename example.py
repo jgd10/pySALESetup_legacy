@@ -67,13 +67,13 @@ for x1,y1,g1,x2,y2,g2 in zip(group1.xc,group1.yc,group1.grains,group2.xc,group2.
     # increase grain radius
     r1 = g1.radius+4
     # generate new grain with new radius
-    g1.mesh = pss.gen_ellipse(r1,g1.angle,g1.eccentricity) 
+    g1.mesh = pss.grainfromEllipse(r1,g1.angle,g1.eccentricity) 
     # place new grain in mesh1
     g1.place(x1,y1,8,mesh1)
     
     #repeat for mesh2
     r2 = g2.radius+4
-    g2.mesh = pss.gen_ellipse(r2,g2.angle,g2.eccentricity) 
+    g2.mesh = pss.grainfromEllipse(r2,g2.angle,g2.eccentricity) 
     g2.place(x2,y2,8,mesh2)
 
 
@@ -90,9 +90,11 @@ mesh3 = pss.combine_meshes(mesh1,mesh2,axis=1)
 
 # View our handiwork!
 mesh3.viewVels()
-mesh3.viewMats()
+mesh3.viewMats(save=True)
 
 # Save the new mesh, can specify a filename but defaults to
 # meso_m.iSALE or meso_m.iSALE.gz if compress = True.
 # (compressed input files are also taken as input by iSALE)
+print "compressing..."
 mesh3.save(compress=True)
+print "saved"
