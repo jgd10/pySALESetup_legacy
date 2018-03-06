@@ -1,5 +1,6 @@
 import random
 import numpy as np
+import cPickle as pickle
 import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -291,7 +292,8 @@ class Grain:
     is the radius a circle of equal area would possess. This allows for easy relative scaling of grains which are different 
     shapes.
     """
-    def __init__(self, eqr=10., rot=0., shape='circle', File=None, elps_params=None, poly_params=None, mixed=False):
+    def __init__(self, eqr=10., rot=0., shape='circle', 
+            File=None, elps_params=None, poly_params=None, mixed=False, name='grain1', Reload=False):
         """
         When initialised the type of shape must be specified. Currently pySALESetup can handle N-sided polygons, 
         circles and ellipses. Other shapes can be added if and when necessary (e.g. hybrids).
@@ -305,13 +307,20 @@ class Grain:
             elps_params: list of floats; [major radius (cells), eccentricity]
             poly_params: 2D list of floats; [[X0,Y0],[X1,Y1],...,[XN,YN]] coords of all vertices on a 2x2 grid -1 <= X,Y <= 1
             mixed:       bool; mixed cells on or off
+            name:        string; label for the instance
+            Reload:      bool; if true, attempt to get attributes from pickle file in form name.obj
         """
-        self.equiv_rad = eqr
-        self.angle = rot
-        self.shape = shape
-        self.mixed = mixed
-        self.hostmesh = None
-        self.mat = None
+        self.name = name
+        if Reload:
+            self.load()
+            print 'loaded {}'.format(self.name)
+        else:
+            self.equiv_rad = eqr
+            self.angle = rot
+            self.shape = shape
+            self.mixed = mixed
+            self.hostmesh = None
+            self.mat = None
         if self.shape == 'circle' or self.shape =='sphere':
             self.shape = 'circle'
             self.radius = self.equiv_rad
@@ -335,6 +344,12 @@ class Grain:
             print "ERROR: unsupported string -- {} --  used for shape.".format(self.shape)
         # more to be added...
         self.Px,self.Py = np.shape(self.mesh)
+    def details(self):
+        """creates easily printable string of details of this instance"""
+        deets = "Grain instance called {}:\nshape: {}\nrotation: {:3.2f} rad\n".format(self.name,self.shape,self.angle)
+        deets += "equivalent radius: {:3.2f} cells\ncurrent coords: ({:2.2g}, {:2.2g})\n".format(self.equiv_rad,self.x,self.y)
+        deets += "mixed cells: {}".format(self.mixed)
+        return deets
     def view(self):
         """ view the grain in a simple plot """
         fig = plt.figure()
@@ -642,6 +657,21 @@ class Grain:
             self.place(x,y,m,target)
         return
 
+    def save(self):
+        """save class as self.name.obj"""
+        file = open(self.name+'.obj','w')
+        file.write(pickle.dumps(self.__dict__))
+        file.close()
+        return
+
+    def load(self):
+        """try load self.name.txt"""
+        file = open(self.name+'.obj','r')
+        dataPickle = file.read()
+        file.close()
+        self.__dict__ = pickle.loads(dataPickle)
+        return
+
 class Ensemble:
     """
     A class wherein can be stored information on grains 
@@ -653,23 +683,31 @@ class Ensemble:
     e.g. a bimodal particle bed; particles from two different materials. Ensemble classes
     can store their information separately and optimise their materials separately.
     """
-    def __init__(self,hostmesh):
+    def __init__(self,hostmesh,name='Ensemble1',Reload=False):
         """
         Args:
             host_mesh: Mesh
+            name:      string
+            Reload:    bool; see Grain instance
         """
         assert hostmesh is not None, "ERROR: ensemble must have a host mesh"
-        self.grains = []
-        self.number = 0
-        self.rots   = []
-        self.radii = [] 
-        self.areas = []
-        self.phi = [] #self._krumbein_phi()
-        self.hostmesh = hostmesh
-        self.xc = []
-        self.yc = []
-        self.mats = []
-        self.shapes = []
+        self.name = name
+        if Reload:
+            self.load()
+            self.hostmesh = hostmesh
+            print 'loaded {}'.format(self.name)
+        else:
+            self.hostmesh = hostmesh
+            self.grains = []
+            self.number = 0
+            self.rots   = []
+            self.radii = [] 
+            self.areas = []
+            self.phi = [] #self._krumbein_phi()
+            self.xc = []
+            self.yc = []
+            self.mats = []
+            self.shapes = []
 
     def add(self,particle,x=None,y=None):
         """
@@ -694,6 +732,14 @@ class Ensemble:
         self.phi.append(-np.log2(particle.equiv_rad))
         self.areas.append(particle.area)
         self.shapes.append(particle.shape)
+    
+    def details(self):
+        """creates easily printable string of details of this instance"""
+        deets  = "Ensemble instance called {}:\nGrain shapes: {}\n".format(self.name,np.unique(self.shapes))
+        deets += "Number of grains: {}\n".format(self.number)
+        deets += "Mean equivalent radius: {:3.2f} cells; std: {:3.2f} cells\n".format(np.mean(self.radii),np.std(self.radii))
+        deets += "Materials used: {}\n".format(np.unique(self.mats))
+        return deets
 
     def _krumbein_phi(self):
         """
@@ -764,45 +810,63 @@ class Ensemble:
         Returns:
             MAT:  array; containg an optimal material number for each grain
         """
-        N    = self.number                                                               # No. of particles
+        # No. of particles
+        N    = self.number                                                               
         M    = len(mats)
-        L    = self.hostmesh.cellsize                                                        # Length of one cell
+        # Length of one cell
+        L    = self.hostmesh.cellsize                                                        
         assert type(mats)==np.ndarray,"ERROR: material list must be a numpy array!"
         matsARR = np.array(mats)
-        MAT  = np.array(self.mats)                                                       # Array for all material numbers of all particles
+        # Array for all material numbers of all particles
+        MAT  = np.array(self.mats)                                                       
         xcARR = np.array(self.xc)
         ycARR = np.array(self.yc)
-        i = 0                                                                            # Counts the number of particles that have been assigned
-        while i < N:                                                                     # Loop every particle and assign each one in turn.    
+        # Counts the number of particles that have been assigned
+        i = 0                                                                            
+        # Loop every particle and assign each one in turn.    
+        while i < N:                                                                     
             Ns = max(self.grains[i].Px,self.grains[i].Py)
             xc = self.xc[i]
             yc = self.yc[i]
-            lowx   = xc - 3.*Ns*L                                                        # Create a 'box' around each particle (in turn) that is 6Ns x 6Ns
+            # Create a 'box' around each particle (in turn) that is 6Ns x 6Ns
+            lowx   = xc - 3.*Ns*L                                                        
             higx   = xc + 3.*Ns*L
             lowy   = yc - 3.*Ns*L
             higy   = yc + 3.*Ns*L
             # consider grains in the box that are also NOT the grain being considered!
             condition =(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)*(self.xc!=xc)*(self.yc!=yc) 
-            boxmat =     MAT[condition]                                                  # Array containing a list of all material numbers within the 'box' 
-            boxx   =   xcARR[condition]                                                  # Array containing the corresponding xcoords
-            boxy   =   ycARR[condition]                                                  # and the ycoords
+            # Array containing a list of all material numbers within the 'box' 
+            boxmat =     MAT[condition]                                                  
+            # Array containing the corresponding xcoords
+            boxx   =   xcARR[condition]                                                  
+            # and the ycoords
+            boxy   =   ycARR[condition]                                                  
             nn     =  np.size(boxmat)
-            D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             # Calculate the distances to the nearest particles
-            ind = np.argsort(D)                                                          # Sort the particles into order of distance from the considered particle
-            BXM = boxmat[ind]                                                            # Sort the materials into the corresponding order
-            DU  = np.unique(BXM[:M])                                                     # Only select the M closest particles
-            if np.array_equal(DU, matsARR):                                              # If the unique elements in this array equate the array of 
-                                                                                         # materials then all are taken
+            # Calculate the distances to the nearest particles
+            D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             
+            # Sort the particles into order of distance from the considered particle
+            ind = np.argsort(D)                                                          
+            # Sort the materials into the corresponding order
+            BXM = boxmat[ind]                                                            
+            # Only select the M closest particles
+            DU  = np.unique(BXM[:M])                                                     
+            if np.array_equal(DU, matsARR):                                              
+                # If the unique elements in this array equate the array of       
+                # materials then all are taken
+                # Set the particle material to be of the one furthest from 
+                # the starting particle
                 mm     = BXM[-1]                                                                           
-                MAT[i] = mm                                                              # Set the particle material to be of the one furthest from 
-                                                                                         # the starting particle
-            else:                                                                        # Else there is a material in mats that is NOT in DU
-                indices = np.in1d(matsARR,DU,invert=True)                                # This finds the indices of all elements that only appear in 
-                                                                                         # mats and not DU
+                MAT[i] = mm                                                              
+                # Else there is a material in mats that is NOT in DU
+            else:                                                                        
+                # This finds the indices of all elements that only appear in 
+                # mats and not DU
+                indices = np.in1d(matsARR,DU,invert=True)                                
+                # Randomly select one to be the current particle's material number
                 mm      = np.random.choice(matsARR[indices],1)
-                MAT[i]  = mm                                                             # Randomly select one to be the current particle's material number
-                #materials[materials==-1*(i+1)] = mm
-            i += 1                                                                       # Increment i
+                MAT[i]  = mm                                                             
+            # Increment i
+            i += 1                                                                       
         self.mats = list(MAT.astype(int))
         return 
 
@@ -877,7 +941,24 @@ class Ensemble:
     
         Z = F[0,0] + F[1,1]
         A = F[0,0] - F[1,1]
+        self.Z = Z
+        self.A = A
         return Z, A, F
+
+    def save(self):
+        """save class as self.name.obj"""
+        file = open(self.name+'.obj','w')
+        file.write(pickle.dumps(self.__dict__))
+        file.close()
+        return
+
+    def load(self):
+        """try load self.name.obj"""
+        file = open(self.name+'.obj','r')
+        dataPickle = file.read()
+        file.close()
+        self.__dict__ = pickle.loads(dataPickle)
+        return
     
 class Mesh:
     """
