@@ -330,12 +330,13 @@ class Grain:
             assert File is not None, "No file path provided to create grain"
             self.mesh = grainfromVertices(fname=File,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=self.angle)
             self.area = np.sum(self.mesh)
+            self.radius = np.sqrt(self.area/np.pi)
         elif self.shape == 'ellipse':
             assert len(elps_params) == 2, "ERROR: ellipse creation requires elps_params to be of the form [major radius, eccentricity]"
             self.mesh = grainfromEllipse(elps_params[0],self.angle,elps_params[1])
             self.area = np.sum(self.mesh)
             self.eccentricity = elps_params[1]
-            self.radius = elps_params[0]
+            self.radius = np.sqrt(self.area/np.pi)
         elif self.shape == 'polygon':
             assert len(poly_params) >= 3, "ERROR: Polygon creation requires at least 3 unique coordinates"
             self.mesh = grainfromVertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
@@ -629,6 +630,7 @@ class Grain:
         indices = np.column_stack(indices)                                                           
         x,y   = random.choice(indices)                                                               
         end = False
+        r_int = int(self.radius)
         while not touching:    
             if x > XCELLMAX: x = XCELLMIN
             if x < XCELLMIN: x = XCELLMAX
@@ -641,8 +643,9 @@ class Grain:
                 break
         
             if nospace or (nospace == False  and overlap == 0):
-                dx = random.randint(-self.radius,self.radius)
-                dy = random.randint(-self.radius,self.radius)
+
+                dx = random.randint(-r_int,r_int)
+                dy = random.randint(-r_int,r_int)
                 x += dx
                 y += dy
             elif nospace == False and overlap > 0 and overlap <= cell_limit:
@@ -723,7 +726,7 @@ class Ensemble:
         self.grains.append(particle)
         self.number += 1
         self.rots.append(particle.angle)
-        self.radii.append(particle.equiv_rad)
+        self.radii.append(particle.radius)
         if x is None: x = particle.x
         if y is None: y = particle.y
         self.xc.append(x)
@@ -741,6 +744,56 @@ class Ensemble:
         deets += "Materials used: {}\n".format(np.unique(self.mats))
         return deets
 
+    def calcPSD(self,forceradii=False,returnplots=False):
+        """
+        Generates a Particle Size Distribution (PSD) from the Ensemble
+        Args:
+            returnplots: bool; if true the function returns ax1 ax2 and fig for further modding
+            forceradii:  bool; if true use radii instead of phi
+        """
+        # use in-built functions to generate the frequencies and vfrac at this instance
+        self.frequency()
+        self._vfrac()
+        
+        # Frequency of each unique area
+        areaFreq = np.array(self.areaFreq.values())
+        # Array of the unique areas
+        areas    = np.array(self.areaFreq.keys())
+        # Probability Distribution Function
+        PDF = areaFreq*areas/(self.hostmesh.Ncells*self.vfrac)
+        # ... as a percentage of total volume fraction occupied
+        PDF *= 100.
+        # Cumulative Distribution Function
+        CDF = np.cumsum(PDF)
+        # krumbein phi, standard measure of grains ize in PSDs
+        phi = np.unique(self._krumbein_phi())
+
+        # create plot for the PSD
+        fig = plt.figure()
+        ax1 = fig.add_subplot(121)
+        ax2 = fig.add_subplot(122)
+        if forceradii:
+            rad = np.unique(self.radii)
+            ax1.plot(rad,PDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
+            ax2.plot(rad,CDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
+            ax1.set_xlabel('Equivalent Radius [mm]')
+            ax2.set_xlabel('Equivalent Radius [mm]')
+        else:
+            ax1.plot(phi,PDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
+            ax2.plot(phi,CDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
+            ax1.set_xlabel('$\phi$' + '\n' + '= -log_2(Equivalent Diameter)$')
+            ax2.set_xlabel('$\phi$' + '\n' + '= -log_2(Equivalent Diameter)$')
+        ax1.set_title('PDF')
+        ax2.set_title('CDF')
+        ax1.set_ylabel('%.Area')
+        
+        # return plots if needed, otherwise show figure
+        if returnplots:
+            return ax1,ax2,fig
+        else:
+            fig.tight_layout()
+            fig.show()
+
     def _krumbein_phi(self):
         """
         Convert all radii in the ensemble to the Krumbein Phi, which is commonly used in 
@@ -757,7 +810,7 @@ class Ensemble:
         """
         Calculate the area fraction the ensemble occupies in the domain
         """
-        self.vfrac = np.sum(self.areas)/self.hostmesharea
+        self.vfrac = np.sum(self.areas)/float(self.hostmesh.Ncells)
 
     def print_vfrac(self):
         """
@@ -1089,7 +1142,7 @@ class Mesh:
         for KK in range(self.NoMats):
             matter = np.copy(self.materials[KK,:,:])*(KK+1)
             matter = np.ma.masked_where(matter==0.,matter)
-            ax.pcolormesh(self.xi,self.yi,matter, cmap='Dark2',vmin=0,vmax=self.NoMats)
+            ax.pcolormesh(self.xi,self.yi,matter, cmap='cividis',vmin=0,vmax=self.NoMats)
         ax.set_xlim(0,self.x)
         ax.set_ylim(0,self.y)
         ax.set_xlabel('$x$ [cells]')

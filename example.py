@@ -16,7 +16,7 @@ group1 = pss.Ensemble(mesh1)
 group2 = pss.Ensemble(mesh2)
 # we want to create (and place) 200 
 # different particles in this case
-for i in range(200):
+for i in range(150):
     # generate some random params for each ellipse
     rot = random.random()*np.pi
     # force eccentricities to be between 0.5 and 0.8
