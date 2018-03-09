@@ -1089,7 +1089,7 @@ class Mesh:
         for KK in range(self.NoMats):
             matter = np.copy(self.materials[KK,:,:])*(KK+1)
             matter = np.ma.masked_where(matter==0.,matter)
-            ax.pcolormesh(self.xi,self.yi,matter, cmap='plasma',vmin=0,vmax=self.NoMats)
+            ax.pcolormesh(self.xi,self.yi,matter, cmap='Dark2',vmin=0,vmax=self.NoMats)
         ax.set_xlim(0,self.x)
         ax.set_ylim(0,self.y)
         ax.set_xlabel('$x$ [cells]')
@@ -1368,12 +1368,13 @@ class Apparatus:
         if xcoords[0] != xcoords[-1] or ycoords[0] != ycoords[-1]:
             xcoords = np.append(xcoords,xcoords[0])
             ycoords = np.append(ycoords,ycoords[0])
-        self.x = xcoords
-        self.y = ycoords
+        self.x = np.array(xcoords)
+        self.y = np.array(ycoords)
 
         # find the box that entirely encompasses the polygon
         self.L = np.array([np.amin(xcoords),np.amax(xcoords)])
         self.T = np.array([np.amin(ycoords),np.amax(ycoords)])
+        
 
     def rotate(self, angle):
         ct    = np.cos(angle)
@@ -1382,54 +1383,53 @@ class Apparatus:
         self.y = self.x*st + self.y*ct
 
         
-    def place(self,target,m):
+    def place(self,target,m,overwrite_mats=None):
         """
         inserts the object into the target mesh using the coords stored in Apparatus instance.
         Preference is given to materials already present in the target mesh and these are not overwritten
-        if m == -1 then this erases all material it is placed on.
+        if m == -1 then this erases all material it is placed on. To only overwrite certain materials set 
+        m = 0 and specify which to overwrite in overwrite_mats. Any other materials will be left untouched.
 
         Args:
-            target: Mesh
-            m:      int; material number, -1 == void
+            target:         Mesh
+            m:              int; material number, -1 == void
+            overwrite_mats: list; if not None then materials to be overwritten.
         """
-
+        if m == 0: assert overwrite_mats is not None, "ERROR: if placing void, and specifying material to overwrite, some material MUST be specified!"
+        # if item is a rectangle, go to faster rectangle routine
         if len(self.x) == 5 and len(np.unique(self.x)) == 2 and len(np.unique(self.y)) == 2:
             self._place_rectangle(target,m)
         else:
+        # else use point-in-polygon method available to matplotlib
+            # create path from coords of shape
             self.path = mpath.Path(np.column_stack((self.x,self.y)))
-            inbox_condition = (target.yy<=self.L[1])*(target.yy>=self.L[0])*(target.xx<=self.T[1])*(target.xx>=self.T[0])
-            Xc_TEMP = target.xx[inbox_condition]
-            Yc_TEMP = target.yy[inbox_condition]
-
-            # store all indices of each coord that is in the polygon in two arrays
-            x_success = np.ones_like(Xc_TEMP,dtype=int)*-9999
-            y_success = np.ones_like(Yc_TEMP,dtype=int)*-9999
-
-            # cycle through all these points
-            # store successes in arrays
-            k = 0
-            for x, y in zip(Xc_TEMP,Yc_TEMP):
-                in_shape = self.path.contains_point([x,y])
-                if in_shape:
-                    x_success[k] = np.where((target.xx==x)*(target.yy==y))[0][0] 
-                    y_success[k] = np.where((target.xx==x)*(target.yy==y))[1][0]
-                    k += 1
-            x_suc = x_success[x_success!=-9999] 
-            y_suc = y_success[y_success!=-9999] 
-
+            # Check all coordinates in mesh and return bool of which in shape and which not
+            inshape = self.path.contains_points(zip(target.xi.flatten(),target.yi.flatten()))
+            # This array is flattened so reshape to correct dims
+            inshape = inshape.reshape(target.x,target.y)
+            
+            # if material = void then delete the matter in shape
             if m == -1:
                 # select the necessary material using new arrays of indices
-                for mm in range(target.NoMats):
-                   materials[mm][x_suc,y_suc] *= 0.
-                target.VX[x_suc,y_suc] *= 0.
-                target.VY[x_suc,y_suc] *= 0.
-                target.mesh[x_suc,y_suc] *= 0.
-            else:
-                temp_materials = np.copy(target.materials[int(m)-1,x_suc,y_suc])
-                temp_materials[(np.sum(target.materials[:,x_suc,y_suc],axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
-                temp_2 = np.sum(target.materials[:,x_suc,y_suc],axis=0)*temp_materials
+                materials[:][inshape] *= 0.
+                target.VX[inshape] *= 0.
+                target.VY[inshape] *= 0.
+                target.mesh[inshape] *= 0.
+            # if m is a valid material (m>0) then fill that material as in prev place functions
+            elif m > 0:
+                temp_materials = np.copy(target.materials[int(m)-1])
+                temp_materials[inshape*(np.sum(target.materials,axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
+                temp_2 = np.sum(target.materials,axis=0)*temp_materials
                 temp_materials -= temp_2
-                target.materials[int(m)-1,x_suc,y_suc] += temp_materials
+                target.materials[int(m)-1] += temp_materials
+            # if m set to 0 and materials specified to be overwritten, then delete only those.
+            elif overwrite_mats is not None and m == 0:
+                for mm in overwrite_mats:
+                    materials[mm-1][inshape] *= 0.
+                # Check vels after this because not all matter in the shape may necessarily have been deleted
+                target.checkVels()
+
+
             return
     
     def _place_rectangle(self,target,m):
