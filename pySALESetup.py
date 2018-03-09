@@ -103,14 +103,15 @@ def MeshfromBMP(imname,cellsize=2.e-6):
     Different shades are treated as different materials, however, white is ignored
     and treated as 'VOID'.
 
+    NB bmp can NOT have colour info or an alpha channel.
+
     Args:
         A: 2D array of grayscale integer; black - white values (0 - 255)
         cellsize: float; equivalent to GRIDSPC, size of each cell
     Returns:
         mesh: Mesh
     """
-    im = Image.open(imname)
-    
+    im = Image.open(imname) 
     B = np.asarray(im)
     A = np.copy(B)
     A = np.rot90(A,k=3)
@@ -781,8 +782,8 @@ class Ensemble:
         else:
             ax1.plot(phi,PDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
             ax2.plot(phi,CDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
-            ax1.set_xlabel('$\phi$' + '\n' + '= -log_2(Equivalent Diameter)$')
-            ax2.set_xlabel('$\phi$' + '\n' + '= -log_2(Equivalent Diameter)$')
+            ax1.set_xlabel('$\phi$' + '\n' + '$= -log_2(Equivalent Diameter)$')
+            ax2.set_xlabel('$\phi$' + '\n' + '$= -log_2(Equivalent Diameter)$')
         ax1.set_title('PDF')
         ax2.set_title('CDF')
         ax1.set_ylabel('%.Area')

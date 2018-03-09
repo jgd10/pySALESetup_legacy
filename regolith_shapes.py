@@ -96,7 +96,8 @@ except KeyboardInterrupt:
     pass
 
 
-print groupA.fabricTensor_discs()
+#print groupA.fabricTensor_discs()
+groupA.calcPSD()
 
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
