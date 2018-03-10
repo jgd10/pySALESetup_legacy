@@ -1,0 +1,400 @@
+ ===================================================== 
+               _______   __   ________    __           
+    ___  __ __/ __/ _ | / /  / __/ __/__ / /___ _____  
+   / _ \/ // /\ \/ __ |/ /__/ _/_\ \/ -_) __/ // / _ \ 
+  / .__/\_, /___/_/ |_/____/___/___/\__/\__/\_,_/ .__/ 
+ /_/   /___/                                   /_/     
+                                      by J. G. Derrick 
+ ===================================================== 
+Help on module pySALESetup:
+
+NAME
+    pySALESetup
+
+FILE
+    /Users/jgd10/pySALESetup/docs/pySALESetup.py
+
+CLASSES
+    Apparatus
+    Ensemble
+    Grain
+    Mesh
+    
+    class Apparatus
+     |  Polygon object inserted into a Mesh instance. Example of apparatus
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, xcoords, ycoords)
+     |      This function fills all cells within a polygon defined by the vertices in arrays 
+     |      xcoords and ycoords; coords MUST be in clockwise order!
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |      ~if mat == -1. this fills the cells with VOID and overwrites everything.~
+     |      ~and additionally sets all velocities in those cells to zero            ~
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     |  
+     |  place(self, target, m, overwrite_mats=None)
+     |      inserts the object into the target mesh using the coords stored in Apparatus instance.
+     |      Preference is given to materials already present in the target mesh and these are not overwritten
+     |      if m == -1 then this erases all material it is placed on. To only overwrite certain materials set 
+     |      m = 0 and specify which to overwrite in overwrite_mats. Any other materials will be left untouched.
+     |      
+     |      Args:
+     |          target:         Mesh
+     |          m:              int; material number, -1 == void
+     |          overwrite_mats: list; if not None then materials to be overwritten.
+     |  
+     |  rotate(self, angle)
+    
+    class Ensemble
+     |  A class wherein can be stored information on grains 
+     |  In addition to storing the information of any grains added to it, it has some other
+     |  functions. None are more useful than optimise_materials, that will tell you the 
+     |  optimum material distribution (given a certain number) for grains in your ensemble.
+     |  
+     |  This class was designed primarily to allow for multiple ensembles in the same domain
+     |  e.g. a bimodal particle bed; particles from two different materials. Ensemble classes
+     |  can store their information separately and optimise their materials separately.
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, hostmesh, name='Ensemble1', Reload=False)
+     |      Args:
+     |          host_mesh: Mesh
+     |          name:      string
+     |          Reload:    bool; see Grain instance
+     |  
+     |  add(self, particle, x=None, y=None)
+     |      Add a grain to the Ensemble. Allow x and y to be specified when adding because
+     |      grain may not be placed yet and have no value, for example. There are other, more
+     |      niche, reasons for this as well.
+     |      
+     |      Args:
+     |          particle: Grain
+     |          x:        float
+     |          y:        float
+     |  
+     |  area_weights()
+     |  
+     |  calcPSD(self, forceradii=False, returnplots=False)
+     |      Generates a Particle Size Distribution (PSD) from the Ensemble
+     |      Args:
+     |          returnplots: bool; if true the function returns ax1 ax2 and fig for further modding
+     |          forceradii:  bool; if true use radii instead of phi
+     |  
+     |  details(self)
+     |      creates easily printable string of details of this instance
+     |  
+     |  fabricTensor_discs(self, tolerance=0.0)
+     |      Calculates the fabric tensor of an Ensemble consisting of
+     |      perfectly circular disks. They do NOT have to be identical in size!
+     |      
+     |      N.B. a tolerance is needed because circles are pixellated in iSALE (standard in 
+     |      eulerian codes). A tolerance should be chosen to ensure the result is accurate;
+     |      typically the cellsize or diagonal length of a cell is a good value.
+     |      
+     |      Args:
+     |      
+     |      tolerance: float; (see N.B. above)
+     |      
+     |      output:
+     |      
+     |          Z: The coordination number (average number of contacts/grain)
+     |          A: The fabric Anisotropy
+     |          F: The fabric tensor
+     |  
+     |  frequency(self)
+     |      Calculate the frequencies of each grain based on their size.
+     |  
+     |  load(self)
+     |      try load self.name.obj
+     |  
+     |  optimise_materials(self, mats=array([1, 2, 3, 4, 5, 6, 7, 8, 9]))
+     |      This function has the greatest success and is based on that used in JP Borg's work with CTH.
+     |      
+     |      Function to assign material numbers to each particle
+     |      This function tries to optimise the assignments such
+     |      that as few particles of the same material are in co
+     |      ntact as possible. It works by creating an array of
+     |      all the particle material numbers within a box, 6 x 6
+     |      radii around each particle coord, as well as the corres
+     |      ponding coords.
+     |      
+     |      Then they are sorted into the order closest -> furthest.
+     |      Only the first M are considered (in this order). M is
+     |      the number of different materials being used. The
+     |      corresponding array of materials is checked against mats.
+     |      
+     |      If they contain all the same elements, there are no repeats
+     |      and all material numbers are used up => use that of the 
+     |      particle furthest away.
+     |      
+     |      If they do not, there is at least one repeat, select the
+     |      remaining material number or randomly select one of those
+     |      left, if there are more than one.
+     |      
+     |      Continue until all the particles are assigned.
+     |      
+     |      Args:
+     |          mats: array; containing all the material numbers to be assigned
+     |      
+     |      Returns:
+     |          MAT:  array; containg an optimal material number for each grain
+     |  
+     |  print_vfrac(self)
+     |      Print out the area fraction; this is a user-accessible function
+     |  
+     |  save(self)
+     |      save class as self.name.obj
+    
+    class Grain
+     |  Instances can be created separate to a Mesh class and inserted at will. The main feature of Each instance
+     |  is the mesh. This is a mini-domain that contains all the cells that are filled or not. This constitutes the 'grain'. Other
+     |  properties are stored in relation to it such as the shape type, area, rotation, and 'equivalent radius'. Equivalent radius 
+     |  is the radius a circle of equal area would possess. This allows for easy relative scaling of grains which are different 
+     |  shapes.
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, eqr=10.0, rot=0.0, shape='circle', File=None, elps_params=None, poly_params=None, mixed=False, name='grain1', Reload=False)
+     |      When initialised the type of shape must be specified. Currently pySALESetup can handle N-sided polygons, 
+     |      circles and ellipses. Other shapes can be added if and when necessary (e.g. hybrids).
+     |      Mixed cells mode has not been fully tested yet.   
+     |      
+     |      Args:
+     |          eqr:         float; radius of a circle with the same area
+     |          rot:         float; angle to rotate the grain by.
+     |          shape:       string; label for the shape of the grain
+     |          File:        string; if file specified contains path to file
+     |          elps_params: list of floats; [major radius (cells), eccentricity]
+     |          poly_params: 2D list of floats; [[X0,Y0],[X1,Y1],...,[XN,YN]] coords of all vertices on a 2x2 grid -1 <= X,Y <= 1
+     |          mixed:       bool; mixed cells on or off
+     |          name:        string; label for the instance
+     |          Reload:      bool; if true, attempt to get attributes from pickle file in form name.obj
+     |  
+     |  details(self)
+     |      creates easily printable string of details of this instance
+     |  
+     |  insertRandomly(self, target, m, xbounds=None, ybounds=None)
+     |      insert grain into bed in an empty space. By default select from whole mesh, 
+     |      alternatively, choose coords from region bounded by xbounds = [xmin,xmax] and 
+     |      ybounds = [ymin,ymax]. Position is defined by grain CENTRE
+     |      so overlap with box boundaries is allowed.
+     |      
+     |      Args:
+     |          target: Mesh
+     |          m:      int; material number
+     |          xbounds: list
+     |          ybounds: list
+     |  
+     |  insertRandomwalk(self, target, m, xbounds=None, ybounds=None)
+     |      Similar to insertRandomly. Randomly walk until allowed contact established and place
+     |      Initial coordinates taken from box and on a void cell
+     |      Move grain by random increments of equivalent radius in x and y
+     |      Once in contact with another grain 
+     |          (contact defined as 'overlaps by 100th the area of active grain')
+     |      place into mesh
+     |      If bounded by x/ybounds; do not allow motion outside of these.
+     |      
+     |      Args:
+     |          target:  Mesh
+     |          m:       int; material number
+     |          xbounds: list
+     |          ybounds: list
+     |  
+     |  load(self)
+     |      try load self.name.txt
+     |  
+     |  place(self, x, y, m, target, num=None)
+     |      Inserts the shape into the correct materials mesh at coordinate x, y.
+     |      
+     |      Args:
+     |          x, y   : float; The x and y coords at which the shape is to be placed. (These are the shape's origin point)
+     |          m      : int; this is the index of the material
+     |          target : Mesh; the target mesh, must be a 'Mesh' instance
+     |          num    : int; the 'number' of the particle.
+     |      
+     |      existing material takes preference and is not displaced
+     |      
+     |      nothing is returned.
+     |  
+     |  save(self)
+     |      save class as self.name.obj
+     |  
+     |  view(self)
+     |      view the grain in a simple plot
+    
+    class Mesh
+     |  This is the domain class and it tracks all materials placed into it. Main features
+     |  are the material fields--NB. of materials is ALWAYS 9 (the maximum). When saving,
+     |  if a material is not used it is not included in the output file--, the velocity fields
+     |  which include both x and y component fields, and the 'mesh' field. This acts like a test
+     |  domain with only one material field and is mostly used internally.
+     |  
+     |  Methods defined here:
+     |  
+     |  __init__(self, X=500, Y=500, cellsize=2e-06, mixed=False)
+     |      Initialise the Mesh class. Defaults are typical for mesoscale setups which this module
+     |      was originally designed for.
+     |      
+     |      Args:
+     |          X:        int
+     |          Y:        int
+     |          cellsize: float; equivalent to GRIDSPC in iSALE
+     |          mixed:    bool
+     |  
+     |  blanketVel(self, vel, axis=1)
+     |      Assign a blanket velocity to whole domain. Useful before merging meshes or when using other objects in iSALE.
+     |  
+     |  calcVol(self, m=None)
+     |      Calculate area of non-void in domain for material(s) m.
+     |  
+     |  checkVels(self)
+     |      Ensures no void cells have velocities.
+     |  
+     |  fillAll(self, m)
+     |      Fills entire mesh with material m. if m ==-1, it will fill it with void (essentially 
+     |      deleting all contents of the mesh). Otherwise existing material is prioritised.
+     |  
+     |  fillPlate(self, m, MMin, MMax, axis=0)
+     |      Fills all rows (or columns if axis = 1) of mesh with material m between MMin and MMax. 
+     |      if m ==-1, it will fill it with void (essentially deleting existing matter). Otherwise 
+     |      existing material is prioritised.
+     |  
+     |  matrixPorosity(self, matrix, bulk, void=False, Print=True)
+     |      calculate sthe necessary matrix porosity to achieve a target bulk porosity
+     |      given current domain occupance.
+     |  
+     |  max_porosity_variation(self, partitions=2)
+     |      Function that finds the largest varition in porosity across the entire mesh. 
+     |      This will give incorrect answers when the mesh is not purely granular.
+     |      returns the maximum difference between two partitions of the same orientation.
+     |  
+     |  multiplyVels(self, multiplier=0.5, axis=1)
+     |      This function multiplies all velocities by a 'multiplier' factor.
+     |      works on whole mesh.
+     |  
+     |  plateVel(self, ymin, ymax, vel, axis=0)
+     |      Assign velocity in a plate shape; works both horizontally and vertically.
+     |  
+     |  save(self, fname='meso_m.iSALE', noVel=False, info=False, compress=False)
+     |      A function that saves the current mesh as a text file that can be read, verbatim into iSALE.
+     |      This compiles the integer indices of each cell, as well as the material in them and the fraction
+     |      of matter present. It saves all this as the filename specified by the user, with the default as 
+     |      meso_m.iSALE
+     |      
+     |      This version of the function works for continuous and solid materials, such as a multiple-plate setup.
+     |      It does not need to remake the mesh as there is no particular matter present.
+     |      
+     |      fname   : The filename to be used for the text file being used
+     |      mixed   : Are mixed cells used?
+     |      noVel   : Does not include velocities in meso_m.iSALE file
+     |      info    : Include particle ID (i.e. #) as a column in the final file 
+     |      compress: compress the file? For large domains it is often necessary to avoid very large files; uses gz
+     |      
+     |      returns nothing but saves all the info as a txt file called 'fname' and populates the materials mesh.
+     |  
+     |  top_and_tail(self, num=3, axis=1)
+     |      Sets top and bottom 3 rows/columns to void cells. Recommended when edges moving away from boundary
+     |      are porous. Prevents erroneous tension/densities.
+     |  
+     |  viewMats(self, save=False, fname='mats.png')
+     |      View all material fields in a simple matpltolib plot
+     |  
+     |  viewVels(self, save=False, fname='vels.png')
+     |      View velocities in a simple plot and save file if wanted.
+
+FUNCTIONS
+    MeshfromBMP(imname, cellsize=2e-06)
+        Function that populates a Mesh instance from a bitmap, or similar.
+        When opened by PIL the result MUST be convertible to a 2D array of
+        grayscale values (0-255).
+        
+        Different shades are treated as different materials, however, white is ignored
+        and treated as 'VOID'.
+        
+        NB bmp can NOT have colour info or an alpha channel.
+        
+        Args:
+            A: 2D array of grayscale integer; black - white values (0 - 255)
+            cellsize: float; equivalent to GRIDSPC, size of each cell
+        Returns:
+            mesh: Mesh
+    
+    MeshfromPSSFILE(fname='meso_m.iSALE.gz', cellsize=2e-06, NumMats=9)
+        Generate a Mesh instance from an existing meso output file. NB NumMats
+        MUST be set explicitly because the function does not have the capbility 
+        to read from file yet.
+        
+        Args: 
+            fname: string
+            cellsize: float
+            NumMats: int
+    
+    combine_meshes(mesh2, mesh1, axis=1)
+        Combines two mesh classes, either horizontally or vertically and creates a new Mesh instance
+        for the result. Material fractions are carried over, as are velocities, and the 'mesh' param.
+        
+        Args:
+            mesh2: Mesh instance
+            mesh1: Mesh instance
+        
+        Returns:
+            New: new Mesh instance
+    
+    grainfromCircle(r_)
+        This function generates a circle within the base mesh0. It very simply converts
+        each point to a radial coordinate from the origin (the centre of the shape.
+        Then assesses if the radius is less than that of the circle in question. If it 
+        is, the cell is filled.
+        
+        Args:
+            r_: radius of the circle, origin is assumed to be the centre of the mesh0
+        
+        Returns:
+            mesh0: square array of floats
+    
+    grainfromEllipse(r_, a_, e_)
+        This function generates an ellipse in mesh0. It uses a semi-major axis of r_
+        a rotation of a_ and an eccentricity of e_. It otherwise works on
+        principles similar to those used in grainfromEllipse
+        
+        Args:
+            r_ : int; the semi major axis (in cells)
+            a_ : float; the angle of rotation (in radians)
+            e_ : float; the eccentricity of the ellipse
+        Returns:
+            mesh0: square array of floats
+    
+    grainfromVertices(R=None, fname='shape.txt', mixed=False, eqv_rad=10.0, rot=0.0, min_res=5)
+        This function generates a mesh0 from a text file containing a list of its vertices
+        in normalised coordinates over a square grid of dimensions 1 x 1. Centre = (0,0)
+        coordinates must be of the form:
+        j   i
+        x   x
+        x   x
+        x   x
+        .   .
+        .   .
+        .   .
+        and the last coordinate MUST be identical to the first. Additionally function will take
+        an array R instead, of the same form.
+        
+        Args:
+            mixed:       logical; partially filled cells on or off                           
+            rot:         float; rotation of the grain (radians)                            
+            areascale:   float; Fraction between 0 and 1, indicates how to scale the grain 
+            min_res:     int; Minimum resolution allowed for a grain                     
+        Returns:
+            mesh_:       square array with filled cells, with value 1
+    
+    polygon_area(X, Y)
+        Returns exact area of a polygon
+        
+        Args:
+            X: [x coords] 
+            Y: [y coords]
+        Returns:
+            A: Scalar float
+
+
