@@ -2,3 +2,6 @@
 *.iSALE.gz
 */pySALESetup.py
 *.pyc
+*.txt
+!docs/*.txt
+*.obj
