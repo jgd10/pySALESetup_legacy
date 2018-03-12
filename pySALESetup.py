@@ -515,29 +515,26 @@ class Grain:
             box[(target.yy<ybounds[0])] = 9999.
             box[(target.xx>xbounds[1])] = 9999.
             box[(target.xx<xbounds[0])] = 9999.
-        nospace = True                                                                                       
-        counter = 0                                                                                       
-        passes  = 0                                                                                       
+        nospace = True  
+        counter = 0 
+        passes  = 0                                                       
         indices = np.where(box==0.)                                                          
-        indices = np.column_stack(indices)                                                                                                          
-        while nospace:                                                                                 
-            x,y   = random.choice(indices)                                                                
-            nospace, overlap = self._checkCoords(x,y,target)                                                          
-            counter += 1                                                                                  
-            if counter>10000:                                                                              
-                nospace = True                                                                                
-                passes= 1                                                                                 
+        indices = np.column_stack(indices)                      
+        while nospace:                                                                        
+            x,y   = random.choice(indices)                                          
+            nospace, overlap = self._checkCoords(x,y,target)                    
+            counter += 1                                                      
+            if counter>10000:   
+                nospace = True                                                                
+                passes= 1                                                                        
                 print "No coords found after {} iterations; exiting".format(counter)
                 break
         if nospace:
             pass
         else:
-            #self.x = x
-            #self.y = y
-            #self.mat = m
             self.place(x,y,m,target)
         return 
-    def _checkCoords(self,x,y,target,overlap_max=0.):                                                                        
+    def _checkCoords(self,x,y,target,overlap_max=0.): 
         """
         Checks if the grain will overlap with any other material;
         and if it can be placed.
@@ -557,19 +554,19 @@ class Grain:
 
         the value of nospace is returned. False is a failure, True is success.
         """
-        #cell_limit = (np.pi*float(cppr_max)**2.)/100.                                                
-        nospace = False                                                                                    
+        #cell_limit = (np.pi*float(cppr_max)**2.)/100.  
+        nospace = False             
         Is,Js,i_,j_ = self._cropGrain(x,y,target.x,target.y)
         
-        temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])                                    
-        temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])                                            
-        test       = np.minimum(temp_shape,temp_mesh)                                                       
+        temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])
+        temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])
+        test       = np.minimum(temp_shape,temp_mesh)
 
         overlapping_cells = np.sum(test)
-                                                                                                            
-        if (overlapping_cells > overlap_max):                                                                              
+                                                                        
+        if (overlapping_cells > overlap_max):
             nospace = True
-        elif(overlapping_cells == 0):                                                                        
+        elif(overlapping_cells == 0):
             pass
         return nospace, overlapping_cells
 
@@ -620,26 +617,26 @@ class Grain:
             YCELLMAX = int((ybounds[1]-np.amin(target.yy))/target.cellsize)
             YCELLMIN = int((ybounds[0]-np.amin(target.yy))/target.cellsize)
         # Max number of overlapping cells should scale with area.
-        cell_limit = max(np.sum(self.area)/100.,1)                                                
+        cell_limit = max(np.sum(self.area)/100.,1)
         # area ~= 110 cells for 6cppr
         # Does NOT need to be integer since values in the mesh are floats, 
         # and it is their sum that is calculated.
-        touching   = False                                                                           
-        counter    = 0                                                                             
-                                                                                                     
+        touching   = False
+        counter    = 0  
+
         indices = np.where(box==0.)                                                          
-        indices = np.column_stack(indices)                                                           
-        x,y   = random.choice(indices)                                                               
+        indices = np.column_stack(indices)
+        x,y   = random.choice(indices)
         end = False
         r_int = int(self.radius)
         while not touching:    
             if x > XCELLMAX: x = XCELLMIN
             if x < XCELLMIN: x = XCELLMAX
             if y > YCELLMAX: y = YCELLMAX
-            if y < YCELLMIN: y = YCELLMIN                                                            
-            nospace, overlap = self._checkCoords(x,y,target,overlap_max=cell_limit)                   
-            counter += 1                                                                             
-            if counter>100000:                                                                              
+            if y < YCELLMIN: y = YCELLMIN
+            nospace, overlap = self._checkCoords(x,y,target,overlap_max=cell_limit)
+            counter += 1
+            if counter>=10000:
                 print "No coords found after {} iterations; exiting".format(counter)
                 break
         
@@ -846,7 +843,8 @@ class Ensemble:
     
     def optimise_materials(self,mats=np.array([1,2,3,4,5,6,7,8,9])):                        
         """
-        This function has the greatest success and is based on that used in JP Borg's work with CTH.
+        This function has the greatest success and is based on that used in JP Borg's work 
+        with CTH.
     
         Function to assign material numbers to each particle
         This function tries to optimise the assignments such
@@ -922,7 +920,7 @@ class Ensemble:
                 # materials then all are taken
                 # Set the particle material to be of the one furthest from 
                 # the starting particle
-                mm     = BXM[-1]                                                                           
+                mm     = BXM[-1]
                 MAT[i] = mm                                                              
                 # Else there is a material in mats that is NOT in DU
             else:                                                                        
@@ -1121,8 +1119,10 @@ class Mesh:
         dividerX = make_axes_locatable(axX)
         dividerY = make_axes_locatable(axY)
         
-        pvx = axX.pcolormesh(self.xi,self.yi,self.VX, cmap='PiYG',vmin=np.amin(self.VX),vmax=np.amax(self.VX))
-        pvy = axY.pcolormesh(self.xi,self.yi,self.VY, cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
+        pvx = axX.pcolormesh(self.xi,self.yi,self.VX, 
+                cmap='PiYG',vmin=np.amin(self.VX),vmax=np.amax(self.VX))
+        pvy = axY.pcolormesh(self.xi,self.yi,self.VY, 
+                cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
         
         axX.set_title('$V_x$')
         axY.set_title('$V_y$')
@@ -1156,7 +1156,7 @@ class Mesh:
         for KK in range(self.NoMats):
             matter = np.copy(self.materials[KK,:,:])*(KK+1)
             matter = np.ma.masked_where(matter==0.,matter)
-            ax.pcolormesh(self.xi,self.yi,matter, cmap='cividis',vmin=0,vmax=self.NoMats)
+            ax.pcolormesh(self.xi,self.yi,matter, cmap='terrain',vmin=1,vmax=self.NoMats+1)
         ax.set_xlim(0,self.x)
         ax.set_ylim(0,self.y)
         ax.set_xlabel('$x$ [cells]')
@@ -1166,7 +1166,8 @@ class Mesh:
 
     def top_and_tail(self,num=3,axis=1):
         """
-        Sets top and bottom 3 rows/columns to void cells. Recommended when edges moving away from boundary
+        Sets top and bottom 3 rows/columns to void cells. 
+        Recommended when edges moving away from boundary
         are porous. Prevents erroneous tension/densities.
         """
         if axis == 0:
@@ -1253,7 +1254,8 @@ class Mesh:
 
     def blanketVel(self,vel,axis=1):
         """
-        Assign a blanket velocity to whole domain. Useful before merging meshes or when using other objects in iSALE.
+        Assign a blanket velocity to whole domain. 
+        Useful before merging meshes or when using other objects in iSALE.
         """
         assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
         if axis == 0:
@@ -1322,12 +1324,16 @@ class Mesh:
 
     def save(self,fname='meso_m.iSALE',info=False,compress=False):
         """
-        A function that saves the current mesh as a text file that can be read, verbatim into iSALE.
-        This compiles the integer indices of each cell, as well as the material in them and the fraction
-        of matter present. It saves all this as the filename specified by the user, with the default as 
+        A function that saves the current mesh as a text file that can be read, 
+        verbatim into iSALE.
+        This compiles the integer indices of each cell, 
+        as well as the material in them and the fraction
+        of matter present. It saves all this as the filename specified by the user, 
+        with the default as 
         meso_m.iSALE
         
-        This version of the function works for continuous and solid materials, such as a multiple-plate setup.
+        This version of the function works for continuous and solid materials, 
+        such as a multiple-plate setup.
         It does not need to remake the mesh as there is no particular matter present.
         
         Args:
@@ -1335,7 +1341,8 @@ class Mesh:
             info    : Include particle ID (i.e. #) as a column in the final file 
             compress: compress the file? For large domains it is often necessary to avoid very large files; uses gz
         
-        returns nothing but saves all the info as a txt file called 'fname' and populates the materials mesh.
+        returns nothing but saves all the info as a txt file called 'fname' and 
+        populates the materials mesh.
         """
         self.checkVels()
         ncells = self.x*self.y
@@ -1376,7 +1383,7 @@ class Mesh:
         if info:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose(),PI))                                       
         else:
-            ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))                                             
+            ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))
         if compress: fname += '.gz'
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
     
@@ -1422,7 +1429,8 @@ class Mesh:
     
     def _checkFRACs(self,FRAC):
         """
-        This function checks all the volume fractions in each cell and deals with any occurrences where they add to more than one
+        This function checks all the volume fractions in each cell and deals with 
+        any occurrences where they add to more than one
         by scaling down ALL fractions in that cell, such that it is only 100% full.
         
         FRAC : Array containing the full fractions in each cell of each material
@@ -1488,9 +1496,12 @@ class Apparatus:
     def place(self,target,m,overwrite_mats=None):
         """
         inserts the object into the target mesh using the coords stored in Apparatus instance.
-        Preference is given to materials already present in the target mesh and these are not overwritten
-        if m == -1 then this erases all material it is placed on. To only overwrite certain materials set 
-        m = 0 and specify which to overwrite in overwrite_mats. Any other materials will be left untouched.
+        Preference is given to materials already present in the target mesh and these are 
+        not overwritten
+        if m == -1 then this erases all material it is placed on. 
+        To only overwrite certain materials set 
+        m = 0 and specify which to overwrite in overwrite_mats. 
+        Any other materials will be left untouched.
 
         Args:
             target:         Mesh
