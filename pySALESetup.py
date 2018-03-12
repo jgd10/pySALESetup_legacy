@@ -767,7 +767,8 @@ class Ensemble:
         # Cumulative Distribution Function
         CDF = np.cumsum(PDF)
         # krumbein phi, standard measure of grains ize in PSDs
-        phi = np.unique(self._krumbein_phi())
+        rad = np.sqrt(areas/np.pi)
+        phi = self._krumbein_phi(rad)
 
         # create plot for the PSD
         fig = plt.figure()
@@ -789,24 +790,34 @@ class Ensemble:
         ax1.set_ylabel('%.Area')
         
         # return plots if needed, otherwise show figure
-        if returnplots:
-            return ax1,ax2,fig
-        else:
-            fig.tight_layout()
-            fig.show()
+        if returnplots: return ax1,ax2,fig
+        fig.tight_layout()
+        fig.show()
 
-    def _krumbein_phi(self):
+    def _krumbein_phi(self,rad=None):
         """
         Convert all radii in the ensemble to the Krumbein Phi, which is commonly used in 
         particle size distributions.
         """
         phi = []
         # Krumbein phi = -log_2(D/D0) where D0 = 1 mm and D = diameter
-        for r in self.radii:
-            p = -np.log2(2*r)
-            phi.append(p)
+        if rad is None:
+            for r in self.radii:
+                p = -np.log2(2.*r)
+                phi.append(p)
+        else:
+            for r in rad:
+                p = -np.log2(2.*r)
+                phi.append(p)
         return phi
-
+    def _reverse_phi(self,phi):
+        """
+        reverse of krumbein_phi; code supplies input here
+        """
+        rad = []
+        for p in phi:
+            rad.append((2**(-p))*.5)
+        return rad
     def _vfrac(self):
         """
         Calculate the area fraction the ensemble occupies in the domain
@@ -826,6 +837,8 @@ class Ensemble:
         self._krumbein_phi()
         self.frequencies = Counter(self.phi)
         self.areaFreq = Counter(self.areas)
+        print len(self.frequencies.keys())
+        print len(np.unique(self.phi))
 
     def area_weights():
         ensemble_area = _vfrac()*self.hostmesh.area
@@ -1307,7 +1320,7 @@ class Mesh:
         return matrix_por*100.
 
 
-    def save(self,fname='meso_m.iSALE',noVel=False,info=False,compress=False):
+    def save(self,fname='meso_m.iSALE',info=False,compress=False):
         """
         A function that saves the current mesh as a text file that can be read, verbatim into iSALE.
         This compiles the integer indices of each cell, as well as the material in them and the fraction
@@ -1317,11 +1330,10 @@ class Mesh:
         This version of the function works for continuous and solid materials, such as a multiple-plate setup.
         It does not need to remake the mesh as there is no particular matter present.
         
-        fname   : The filename to be used for the text file being used
-        mixed   : Are mixed cells used?
-        noVel   : Does not include velocities in meso_m.iSALE file
-        info    : Include particle ID (i.e. #) as a column in the final file 
-        compress: compress the file? For large domains it is often necessary to avoid very large files; uses gz
+        Args:
+            fname   : The filename to be used for the text file being used
+            info    : Include particle ID (i.e. #) as a column in the final file 
+            compress: compress the file? For large domains it is often necessary to avoid very large files; uses gz
         
         returns nothing but saves all the info as a txt file called 'fname' and populates the materials mesh.
         """
@@ -1361,15 +1373,51 @@ class Mesh:
         FRAC = self._checkFRACs(FRAC)
         HEAD = '{},{}'.format(K,NM)
         #print HEAD
-        if noVel:
-            ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
-        elif info:
+        if info:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose(),PI))                                       
-        elif info and noVel:
-            ALL  = np.column_stack((XI,YI,FRAC.transpose(),PI))                                              
         else:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))                                             
         if compress: fname += '.gz'
+        np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
+    
+    def save_oldver(self,fname='meso_m.iSALE'):
+        """
+        identical to save, except it exports to an old version of output which has no velocity info
+        
+        Args:
+            fname   : The filename to be used for the text file being used
+        """
+        ncells = self.x*self.y
+        
+        XI    = np.zeros((ncells))    
+        YI    = np.zeros((ncells))
+        UX    = np.zeros((ncells))
+        UY    = np.zeros((ncells))
+        K     = 0
+        
+        # make list of used material numbers
+        usedmats = list(self.mats)
+        # iterate through them all
+        for mm in self.mats:
+            # If a material hasn't been used...
+            total = np.sum(self.materials[mm-1])
+            # ...remove from usedmats list
+            if total == 0.: usedmats.remove(mm)
+        NM = len(usedmats)
+        FRAC = np.zeros((NM,ncells))
+        for j in range(self.x):
+            for i in range(self.y):
+                XI[K] = i
+                YI[K] = j
+                UX[K] = self.VX[j,i]
+                UY[K] = self.VY[j,i]
+                for mm in range(NM):
+                    FRAC[mm,K] = self.materials[usedmats[mm]-1,j,i]
+                K += 1
+        FRAC = self._checkFRACs(FRAC)
+        HEAD = '{},{}'.format(K,NM)
+        print "Output mesh {} has shape {} x {}".format(fname,self.x,self.y)
+        ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
     
     def _checkFRACs(self,FRAC):
