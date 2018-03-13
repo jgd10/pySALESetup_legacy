@@ -739,6 +739,8 @@ class Ensemble:
         deets  = "Ensemble instance called {}:\nGrain shapes: {}\n".format(self.name,np.unique(self.shapes))
         deets += "Number of grains: {}\n".format(self.number)
         deets += "Mean equivalent radius: {:3.2f} cells; std: {:3.2f} cells\n".format(np.mean(self.radii),np.std(self.radii))
+        deets += "Largest radius: {:3.2f} cells\n".format(np.amax(self.radii))
+        deets += "Smallest radius: {:3.2f} cells\n".format(np.amin(self.radii))
         deets += "Materials used: {}\n".format(np.unique(self.mats))
         return deets
 
@@ -758,14 +760,15 @@ class Ensemble:
         # Array of the unique areas
         areas    = np.array(self.areaFreq.keys())
         # Probability Distribution Function
-        PDF = areaFreq*areas/(self.hostmesh.Ncells*self.vfrac)
+        PDF = areaFreq*areas/np.sum(areaFreq*areas)
+        print areaFreq
         # ... as a percentage of total volume fraction occupied
         PDF *= 100.
         # Cumulative Distribution Function
         CDF = np.cumsum(PDF)
         # krumbein phi, standard measure of grains ize in PSDs
         rad = np.sqrt(areas/np.pi)
-        phi = self._krumbein_phi(rad)
+        phi = self._krumbein_phi(rad*2.)
 
         # create plot for the PSD
         fig = plt.figure()
@@ -773,12 +776,12 @@ class Ensemble:
         ax2 = fig.add_subplot(122)
         if forceradii:
             rad = np.unique(self.radii)
-            ax1.plot(rad,PDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
+            ax1.plot(rad,PDF,marker='x',mfc='None',linestyle=' ',color='crimson',mew=1.5)
             ax2.plot(rad,CDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
             ax1.set_xlabel('Equivalent Radius [mm]')
             ax2.set_xlabel('Equivalent Radius [mm]')
         else:
-            ax1.plot(phi,PDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
+            ax1.plot(phi,PDF,marker='x',mfc='None',linestyle=' ',color='crimson',mew=1.5)
             ax2.plot(phi,CDF,marker='+',mfc='None',linestyle=' ',color='crimson',mew=1.5)
             ax1.set_xlabel('$\phi$' + '\n' + '$= -log_2(Equivalent Diameter)$')
             ax2.set_xlabel('$\phi$' + '\n' + '$= -log_2(Equivalent Diameter)$')
@@ -787,9 +790,9 @@ class Ensemble:
         ax1.set_ylabel('%.Area')
         
         # return plots if needed, otherwise show figure
-        if returnplots: return ax1,ax2,fig
+        #if returnplots: return ax1,ax2,fig
         fig.tight_layout()
-        fig.show()
+        plt.show()
 
     def _krumbein_phi(self,rad=None):
         """
@@ -800,11 +803,15 @@ class Ensemble:
         # Krumbein phi = -log_2(D/D0) where D0 = 1 mm and D = diameter
         if rad is None:
             for r in self.radii:
-                p = -np.log2(2.*r)
+                # convert radii (which are ALWAYS in cells) to mm
+                r_mm = r*self.hostmesh.cellsize*1.e3
+                # Phi can ONLY take input in mm!
+                p = -np.log2(2.*r_mm)
                 phi.append(p)
         else:
             for r in rad:
-                p = -np.log2(2.*r)
+                r_mm = r*self.hostmesh.cellsize*1.e3
+                p = -np.log2(2.*r_mm)
                 phi.append(p)
         return phi
     def _reverse_phi(self,phi):
@@ -814,6 +821,9 @@ class Ensemble:
         rad = []
         for p in phi:
             rad.append((2**(-p))*.5)
+        # NB rad will be in milimetres! convert to cells:
+        # Also cellsize always in metres
+        rad_cells = rad/(self.hostmesh.cellsize*1.e3)
         return rad
     def _vfrac(self):
         """
@@ -834,8 +844,6 @@ class Ensemble:
         self._krumbein_phi()
         self.frequencies = Counter(self.phi)
         self.areaFreq = Counter(self.areas)
-        print len(self.frequencies.keys())
-        print len(np.unique(self.phi))
 
     def area_weights():
         ensemble_area = _vfrac()*self.hostmesh.area
