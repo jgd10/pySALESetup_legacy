@@ -1,11 +1,13 @@
 import random
+import warnings
 import numpy as np
+from PIL import Image
 import cPickle as pickle
+import scipy.special as sc
+from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from collections import Counter
-from PIL import Image
 
 def polygon_area(X,Y):
     """
@@ -1580,12 +1582,160 @@ class Apparatus:
             target.VY[inrectangle] *= 0.
         else:
             temp_materials = np.copy(target.materials[int(m)-1])
-            temp_materials[inrectangle*(np.sum(target.materials,axis=0)<1.)] = 1. #- np.sum(materials,axis=0)  
+            temp_materials[inrectangle*(np.sum(target.materials,axis=0)<1.)] = 1.
             temp_2 = np.sum(target.materials,axis=0)*temp_materials
             temp_materials -= temp_2
             target.materials[int(m)-1] += temp_materials
         return
 
+class SizeDistribution:
+    """
+    A size distribution is typically represented by a CDF (cumulative distribution function).
+    This class creates one with user-specified CDF. CDFs are of the form 'frequency' vs 'var'
+    and in granular distributions the independent variable is typically krumbein phi, or radius,
+    however this class allows other types. 'frequency' is often volume (area in 2D) or weight.
+    Both options are available, as is pure dimensionless frequency. Phi and area are the defaults.
+    """
+    #def __init__(self,freqtype = 'area', independent = 'phi'):
+    #    self.freqtype = freqtype
+    #    self.independent = independent
+
+    def __init__(self,func=None,lims=None,mu=None,sigma=None,Lamb=None,k=None):
+        self.func = func
+        if callable(func): self.cdf = func
+
+        elif func = 'uniform':
+            assert lims is not None, "ERROR: function must have size limits (ind var)"
+            assert mu is None and sigmas is None, "ERROR: uniform distribution has no mu or sigma params"
+            self.lims = lims
+            self.mean = .5*(lims[0]+lims[1])
+            self.median = self.mean
+            self.mode = None
+            self.variance = (1./12.)*(lims[1]-lims[0])**2.
+            self.skew = 0.
+            self.cdf = self._uniform
+        
+        elif func = 'normal':
+            assert mu is not None and sigma is not None, "ERROR: normal and lognormal defined by mu and sigma values"
+            assert lims is None, "ERROR: normal has no lims at this stage"
+            self.mu = mu
+            self.sigma = sigma
+            self.mean = mu
+            self.median = mu
+            self.mode = mu
+            self.variance = sigma**2.
+            self.skew = 0.
+            self.cdf = self._normal
+        
+        elif func = 'lognormal':
+            assert mu is not None and sigma is not None, "ERROR: normal and lognormal defined by mu and sigma values"
+            assert lims is None, "ERROR: lognormal has no lims at this stage"
+            self.mu = mu
+            self.sigma = sigma
+            self.mean = np.exp(mu+0.5*sigma**2.)
+            self.median = np.exp(mu)
+            self.mode = np.exp(mu-sigma**2.)
+            self.variance = (np.exp(sigma**2.)-1.)*np.exp(2.*mu+sigma**2.)
+            self.skew = (np.exp(sigma**2.)+2.)*np.sqrt(np.exp(sigma**2.) - 1.)
+            self.cdf = self._lognormal
+
+        elif func = 'weibull2':
+            assert lims is None, "ERROR: lognormal has no lims at this stage"
+            assert Lamb is not None and k is not None, "ERROR: Lamb and k must be defined for this distribution" 
+            if Lamb < 0:
+                warnings.warn("lambda must be >= 0, not {:2.2f}; setting to zero this time".format(Lamb))
+                Lamb = 0.
+            if k < 0.:
+                warnings.warn("k must be >= 0, not {:2.2f}; setting to zero this time".format(k))
+                k = 0.
+            self.Lamb = Lamb
+            self.k = k
+            self.mean = Lamb*scsp.gamma(1.+1./k)
+            self.median = Lamb*(np.log(2.))**(1./k)
+            if k > 1:
+                self.mode = Lamb*((k-1)/k)**(1./k)
+            else:
+                self.mode = 0
+            self.variance = (Lamb**2.)*(scsp.gamma(1.+2./k)-(scsp.gamma(1.+1./k))**2.)
+            self.skew = (scsp.gamma(1.+3./k)*Lamb**3. - 3.*self.mean*self.variance - self.mean**3.)
+            self.skew /= self.variance**(3./2.)
+            self.cdf = self._weibull2
+
+    def details(self):
+        deets = "distribution has the following properties:\n"
+        if callable(self.func):
+            deets += "type: user defined\n"
+        elif self.func is not 'uniform':
+            deets += "type: {}\n".format(self.func)
+        else:
+            deets += "type: uniform, over the range {}\n".format(self.lims)
+        deets += "mean = {:2.3f}\n".format(self.mean)
+        deets += "median = {:2.3f}\n".format(self.median)
+        deets += "mode = {:2.3f}\n".format(self.mode)
+        deets += "variance = {:2.3f}\n".format(self.variance)
+        deets += "skewness = {:2.3f}\n".format(self.skew)
+        return deets
+
+    def frequency(self,x,dx):
+        """
+        Integrates over the probability density function of the chosen distribution to return an estimated frequency
+        limits MUST be provided in the form of dx, which allows for uneven limits and is always applied as + and -
+        the given value of x.
+        """
+        if type(dx) != list: 
+            warnings.warn('dx must be a list, set to list this time')
+            dx = [dx*.5,dx*.5]
+        f = abs(self.cdf(x+dx[1]) - self.cdf(x-dx[0]))
+        return f
+
+    
+    def _uniform(self,x):
+        """
+        CDF for a uniform probability density function between minx and maxx
+        """
+        minx = self.lims[0]
+        maxx = self.lims[1]
+        f = (x-minx)/(maxx-minx)
+        if x < minx: 
+            f = 0.
+        elif x >= maxx:
+            f = 1.
+        return f
+
+    def _normal(self,x):
+        """
+        CDF for a normal probability density function centred on mu with std sigma
+        """
+        mu = self.mu
+        sigma = self.sigma
+        f = .5*(1.+scsp.erf((x-mu)/(sigma*np.sqrt(2.))))
+        return f
+    
+    def _lognormal(self,x,mu,sigma):
+        """
+        CDF for a log-normal probability density function centred on mu with std sigma
+        """ 
+        mu = self.mu
+        sigma = self.sigma
+        f = .5 + .5*scsp.erf((np.log(x)-mu)/(sigma*np.sqrt(2.)))
+        return f
+
+    def _weibull2(self,x,Lamb,k):
+        """
+        CDF for a Weibull 2-parameter distribution; lambda is the 'scale' of the distribution
+        k is the 'shape'. This distribution is typically used for PSDs generated by
+        grinding, milling, and crushing operations.
+        """
+        Lamb = self.Lamb
+        k = self.k
+        if x >= 0:
+            f = 1.-np.exp(-(x/Lamb)**k)
+        else:
+            f = 0.
+        return f
+
+
+        
 
 print " ===================================================== "
 print "               _______   __   ________    __           "
