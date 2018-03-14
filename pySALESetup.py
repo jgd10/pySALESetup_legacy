@@ -3,10 +3,11 @@ import warnings
 import numpy as np
 from PIL import Image
 import cPickle as pickle
-import scipy.special as sc
-from collections import Counter
+import scipy.special as scsp
+from scipy import stats as scst
 import matplotlib.pyplot as plt
 import matplotlib.path   as mpath
+from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 def polygon_area(X,Y):
@@ -732,12 +733,14 @@ class Ensemble:
         self.xc.append(x)
         self.yc.append(y)
         self.mats.append(particle.mat)
-        self.phi.append(-np.log2(particle.equiv_rad))
+        self.phi.append(-np.log2(particle.radius*2.*self.hostmesh.cellsize*1.e3))
         self.areas.append(particle.area)
         self.shapes.append(particle.shape)
     
     def details(self):
-        """creates easily printable string of details of this instance"""
+        """
+        creates easily printable string of details of this instance
+        """
         deets  = "Ensemble instance called {}:\nGrain shapes: {}\n".format(self.name,np.unique(self.shapes))
         deets += "Number of grains: {}\n".format(self.number)
         deets += "Mean equivalent radius: {:3.2f} cells; std: {:3.2f} cells\n".format(np.mean(self.radii),np.std(self.radii))
@@ -746,16 +749,41 @@ class Ensemble:
         deets += "Materials used: {}\n".format(np.unique(self.mats))
         return deets
 
-    def calcPSD(self,forceradii=False,returnplots=False):
+    def PSDdetails(self):
+        """
+        creates easily printable string of details of the size distribution within this Ensemble
+        """
+        self.calcPSD()
+        deets  = "Ensemble instance called {}:\nGrain shapes: {}\n".format(self.name,np.unique(self.shapes))
+        deets += "The distribution of grains have:\n"
+        deets += "means: {:2.2f} radius; {:2.2f} phi; {:2.2f} area\n".format(*self.means)
+        deets += "medians: {:2.2f} radius; {:2.2f} phi; {:2.2f} area\n".format(*self.medians)
+        deets += "modes: {:2.2f} radius; {:2.2f} phi; {:2.2f} area\n".format(*self.modes)
+        deets += "variances: {:2.2f} radius; {:2.2f} phi; {:2.2f} area\n".format(*self.variances)
+        deets += "skews: {:2.2f} radius; {:2.2f} phi; {:2.2f} area\n".format(*self.skews)
+        return deets
+
+    def calcPSD(self):
+        """
+        Generates a Particle Size Distribution (PSD) from the Ensemble
+        """
+        # use in-built functions to generate the frequencies and vfrac at this instance
+        self.frequency()
+        self._vfrac()
+        self.means    = np.array([np.mean(self.radii),np.mean(self.phi),np.mean(self.areas)])
+        self.medians  = np.array([np.median(self.radii),np.median(self.phi),np.median(self.areas)])
+        self.modes  =   np.array([scst.mode(self.radii,axis=None)[0][0],scst.mode(self.phi,axis=None)[0][0],scst.mode(self.areas,axis=None)[0][0]])
+        self.variances =np.array([np.var(self.radii),np.var(self.phi),np.var(self.areas)])
+        self.skews  =   np.array([scst.skew(self.radii),scst.skew(self.phi),scst.skew(self.areas)])
+
+    def plotPSD(self,forceradii=False,returnplots=False):
         """
         Generates a Particle Size Distribution (PSD) from the Ensemble
         Args:
             returnplots: bool; if true the function returns ax1 ax2 and fig for further modding
             forceradii:  bool; if true use radii instead of phi
         """
-        # use in-built functions to generate the frequencies and vfrac at this instance
-        self.frequency()
-        self._vfrac()
+        self.calcPSD()
         
         # Frequency of each unique area
         areaFreq = np.array(self.areaFreq.values())
@@ -763,14 +791,13 @@ class Ensemble:
         areas    = np.array(self.areaFreq.keys())
         # Probability Distribution Function
         PDF = areaFreq*areas/np.sum(areaFreq*areas)
-        print areaFreq
         # ... as a percentage of total volume fraction occupied
         PDF *= 100.
         # Cumulative Distribution Function
         CDF = np.cumsum(PDF)
         # krumbein phi, standard measure of grains ize in PSDs
         rad = np.sqrt(areas/np.pi)
-        phi = self._krumbein_phi(rad*2.)
+        phi = self._krumbein_phi(rad)
 
         # create plot for the PSD
         fig = plt.figure()
@@ -846,6 +873,8 @@ class Ensemble:
         self._krumbein_phi()
         self.frequencies = Counter(self.phi)
         self.areaFreq = Counter(self.areas)
+        self.frequencies = OrderedDict(sorted(self.frequencies.items(),reverse=True))
+        self.areaFreq = OrderedDict(sorted(self.areaFreq.items(),reverse=True))
 
     def area_weights():
         ensemble_area = _vfrac()*self.hostmesh.area
@@ -1604,7 +1633,7 @@ class SizeDistribution:
         self.func = func
         if callable(func): self.cdf = func
 
-        elif func = 'uniform':
+        elif func == 'uniform':
             assert lims is not None, "ERROR: function must have size limits (ind var)"
             assert mu is None and sigmas is None, "ERROR: uniform distribution has no mu or sigma params"
             self.lims = lims
@@ -1615,7 +1644,7 @@ class SizeDistribution:
             self.skew = 0.
             self.cdf = self._uniform
         
-        elif func = 'normal':
+        elif func == 'normal':
             assert mu is not None and sigma is not None, "ERROR: normal and lognormal defined by mu and sigma values"
             assert lims is None, "ERROR: normal has no lims at this stage"
             self.mu = mu
@@ -1627,7 +1656,7 @@ class SizeDistribution:
             self.skew = 0.
             self.cdf = self._normal
         
-        elif func = 'lognormal':
+        elif func == 'lognormal':
             assert mu is not None and sigma is not None, "ERROR: normal and lognormal defined by mu and sigma values"
             assert lims is None, "ERROR: lognormal has no lims at this stage"
             self.mu = mu
@@ -1639,7 +1668,7 @@ class SizeDistribution:
             self.skew = (np.exp(sigma**2.)+2.)*np.sqrt(np.exp(sigma**2.) - 1.)
             self.cdf = self._lognormal
 
-        elif func = 'weibull2':
+        elif func == 'weibull2':
             assert lims is None, "ERROR: lognormal has no lims at this stage"
             assert Lamb is not None and k is not None, "ERROR: Lamb and k must be defined for this distribution" 
             if Lamb < 0:
@@ -1680,12 +1709,15 @@ class SizeDistribution:
         """
         Integrates over the probability density function of the chosen distribution to return an estimated frequency
         limits MUST be provided in the form of dx, which allows for uneven limits and is always applied as + and -
-        the given value of x.
+        the given value of x. Returns the probability DENSITY! this must be converted to a useful value outside of 
+        the function.
         """
         if type(dx) != list: 
             warnings.warn('dx must be a list, set to list this time')
             dx = [dx*.5,dx*.5]
-        f = abs(self.cdf(x+dx[1]) - self.cdf(x-dx[0]))
+        if self.func == 'lognormal':
+            assert x>=0., "ERROR: Lognormal distribution only works for input greater than 0"
+        f = np.float64(abs(self.cdf(x+dx[1]) - self.cdf(x-dx[0])))
         return f
 
     
@@ -1711,7 +1743,7 @@ class SizeDistribution:
         f = .5*(1.+scsp.erf((x-mu)/(sigma*np.sqrt(2.))))
         return f
     
-    def _lognormal(self,x,mu,sigma):
+    def _lognormal(self,x):
         """
         CDF for a log-normal probability density function centred on mu with std sigma
         """ 
@@ -1720,7 +1752,7 @@ class SizeDistribution:
         f = .5 + .5*scsp.erf((np.log(x)-mu)/(sigma*np.sqrt(2.)))
         return f
 
-    def _weibull2(self,x,Lamb,k):
+    def _weibull2(self,x):
         """
         CDF for a Weibull 2-parameter distribution; lambda is the 'scale' of the distribution
         k is the 'shape'. This distribution is typically used for PSDs generated by
