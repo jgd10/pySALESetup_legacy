@@ -2,6 +2,7 @@ import random
 import warnings
 import numpy as np
 from PIL import Image
+from math import ceil
 import cPickle as pickle
 import scipy.special as scsp
 from scipy import stats as scst
@@ -241,7 +242,7 @@ def grainfromCircle(r_):
     Returns:
         mesh0: square array of floats
     """
-    N = int(2.*r_+2.)
+    N = int(2.*ceil(r_)+2.)
     mesh0 = np.zeros((N,N))
     x0 = r_ + 1.                                                                                   
     y0 = r_ + 1.                                                                                   
@@ -268,7 +269,7 @@ def grainfromEllipse(r_,a_,e_):
     Returns:
         mesh0: square array of floats
     """
-    N = int(2.*r_+2.)
+    N = int(2.*ceil(r_)+2.)
     mesh0 = np.zeros((N,N))
     x0 = r_ + 1                                                                                   
     y0 = r_ + 1                                                                                   
@@ -495,8 +496,8 @@ class Grain:
         so overlap with box boundaries is allowed.
 
         Args:
-            target: Mesh
-            m:      int; material number
+            target:  Mesh
+            m:       int; material number
             xbounds: list
             ybounds: list
         """
@@ -512,24 +513,24 @@ class Grain:
             # ensure all cells in box outside of xmin and xmax won't be considered
             box[(target.xx>xbounds[1])] = 9999.
             box[(target.xx<xbounds[0])] = 9999.
-        elif xbounds is not None and ybounds is not None: 
+        elif xbounds is not None and ybounds is not None:
             # Same proceedure if both given
             box[(target.yy>ybounds[1])] = 9999.
             box[(target.yy<ybounds[0])] = 9999.
             box[(target.xx>xbounds[1])] = 9999.
             box[(target.xx<xbounds[0])] = 9999.
-        nospace = True  
-        counter = 0 
-        passes  = 0                                                       
-        indices = np.where(box==0.)                                                          
-        indices = np.column_stack(indices)                      
-        while nospace:                                                                        
-            x,y   = random.choice(indices)                                          
-            nospace, overlap = self._checkCoords(x,y,target)                    
-            counter += 1                                                      
-            if counter>10000:   
-                nospace = True                                                                
-                passes= 1                                                                        
+        nospace = True
+        counter = 0
+        passes  = 0
+        indices = np.where(box==0.)
+        indices = np.column_stack(indices)
+        while nospace:
+            x,y   = random.choice(indices)
+            nospace, overlap = self._checkCoords(x,y,target)
+            counter += 1
+            if counter>10000:
+                nospace = True
+                passes= 1
                 print "No coords found after {} iterations; exiting".format(counter)
                 break
         if nospace:

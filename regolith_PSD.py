@@ -36,6 +36,8 @@ def PHI_(x):
 
 def DD_(x):
     return 2.**(-x)
+def reverse_phi(p):
+    return (2**(-p))*.5*1.e-3
 
 # Top and bottom mesh created separately
 meshA = pss.Mesh(X=500,Y=1200,cellsize=2.5e-6)
@@ -59,69 +61,81 @@ grainsD = []
 # Minimum krubeim phi = min resolution (4 cppr)
 # Max ... '' '' '' '' = max resolution (200 cppr) 
 # Max res is one which still fits in the domain
-minphi  = -np.log2(2*4*2.5e-3)
-maxphi  = -np.log2(2*200*2.5e-3)
+maxphi  = -np.log2(2*4*2.5e-3)
+minphi  = -np.log2(2*200*2.5e-3)
 
-NA = 3
-NB = 6
-NC = 9
-ND = 12
+NA = 20
+NB = 20
+NC = 20
+ND = 20
 # Generate N phi values and equiv radii (in cells)
 phiA = np.linspace(minphi,maxphi,NA)
 phiB = np.linspace(minphi,maxphi,NB)
 phiC = np.linspace(minphi,maxphi,NC)
 phiD = np.linspace(minphi,maxphi,ND)
 
-RsA = ((DD_(phiA)*.5*1.e-3)/meshA.cellsize)
-RsB = ((DD_(phiB)*.5*1.e-3)/meshB.cellsize)
-RsC = ((DD_(phiC)*.5*1.e-3)/meshC.cellsize)
-RsD = ((DD_(phiD)*.5*1.e-3)/meshD.cellsize)
+RsA = reverse_phi(phiA)/meshA.cellsize
+RsB = reverse_phi(phiB)/meshB.cellsize
+RsC = reverse_phi(phiC)/meshC.cellsize
+RsD = reverse_phi(phiD)/meshD.cellsize
+#RsA = ((DD_(phiA)*.5*1.e-3)/meshA.cellsize)
+#RsB = ((DD_(phiB)*.5*1.e-3)/meshB.cellsize)
+#RsC = ((DD_(phiC)*.5*1.e-3)/meshC.cellsize)
+#RsD = ((DD_(phiD)*.5*1.e-3)/meshD.cellsize)
 
 # interval over which to calculate number from pdf
 # No. = |CDF(x+h) - CDF(x-h)| * no. of areas
-hA = abs(phiA[1]-phiA[0])*.5
-hB = abs(phiB[1]-phiB[0])*.5
-hC = abs(phiC[1]-phiC[0])*.5
-hD = abs(phiD[1]-phiD[0])*.5
+hA = abs(phiA[1]-phiA[0])
+hB = abs(phiB[1]-phiB[0])
+hC = abs(phiC[1]-phiC[0])
+hD = abs(phiD[1]-phiD[0])
+
+# baseline mu and sigma fitted to a normal distribution
+mu = 3.5960554191
+sigma = 2.35633102167
+
+# standard distro
+SDA = pss.SizeDistribution(func='normal',mu=mu,sigma=sigma)
+# twice the std
+sig2 = sigma * 2.
+SDB = pss.SizeDistribution(func='normal',mu=mu,sigma=sig2)
+# half the std
+sig3 = sigma * .5
+SDC = pss.SizeDistribution(func='normal',mu=mu,sigma=sig3)
+# const std, increment mean by 1
+mu2 = mu + 1.
+SDD = pss.SizeDistribution(func='normal',mu=mu2,sigma=sigma)
+
+print SDA.details()
+print SDB.details()
 
 # target area that ALL particles should take up at end
-target_area = float(meshA.x*meshA.y*vfrac)
+target_area = float(meshA.Ncells*vfrac)
 for rA,pA in zip(RsA,phiA):
-    # generate grain object with radius r
-    gA = pss.Grain(eqr=int(rA))
-    # calculate the target number of grains from CDF (see above)
-    prob = abs(CDF(pA+hA) - CDF(pA-hA))
-    gA.targetFreq = int(round(prob * (target_area/float(gA.area))))
-    grainsA.append(gA)
+    freq = SDA.frequency(pA,hA)*target_area
+    freq = int(freq/(np.pi*rA**2.))
+    for f in range(freq):
+        gA = pss.Grain(rA)
+        grainsA.append(gA)
 for rB,pB in zip(RsB,phiB):
-    # generate grain object with radius r
-    gB = pss.Grain(eqr=int(rB))
-    # calculate the target number of grains from CDF (see above)
-    prob = abs(CDF(pB+hB) - CDF(pB-hB))
-    gB.targetFreq = int(round(prob * (target_area/float(gB.area))))
-    grainsB.append(gB)
+    freq = SDB.frequency(pB,hB)*target_area
+    freq = int(freq/(np.pi*rB**2.))
+    for f in range(freq):
+        gB = pss.Grain(rB)
+        grainsB.append(gB)
 for rC,pC in zip(RsC,phiC):
-    # generate grain object with radius r
-    gC = pss.Grain(eqr=int(rC))
-    # calculate the target number of grains from CDF (see above)
-    prob = abs(CDF(pC+hC) - CDF(pC-hC))
-    gC.targetFreq = int(round(prob * (target_area/float(gC.area))))
-    grainsC.append(gC)
+    freq = SDC.frequency(pC,hC)*target_area
+    freq = int(freq/(np.pi*rC**2.))
+    for f in range(freq):
+        gC = pss.Grain(rC)
+        grainsC.append(gC)
 for rD,pD in zip(RsD,phiD):
-    # generate grain object with radius r
-    gD = pss.Grain(eqr=int(rD))
-    # calculate the target number of grains from CDF (see above)
-    prob = abs(CDF(pD+hD) - CDF(pD-hD))
-    gD.targetFreq = int(round(prob * (target_area/float(gD.area))))
-    grainsD.append(gD)
+    freq = SDD.frequency(pD,hD)*target_area
+    freq = int(freq/(np.pi*rD**2.))
+    for f in range(freq):
+        gD = pss.Grain(rD)
+        grainsD.append(gD)
 # library of grains has been generated, now place them into the mesh! 
-# Just meshA for now
-
-# order grains from largest to smallest
-grainsA = [g for _,g in sorted(zip(phiA,grainsA))]
-grainsB = [g for _,g in sorted(zip(phiB,grainsB))]
-grainsC = [g for _,g in sorted(zip(phiC,grainsC))]
-grainsD = [g for _,g in sorted(zip(phiD,grainsD))]
 
 groupA = pss.Ensemble(meshA)
 groupB = pss.Ensemble(meshB)
@@ -130,29 +144,29 @@ groupD = pss.Ensemble(meshD)
 try:
     i = 0
     for gA in grainsA:
-        for f in range(gA.targetFreq):
-            gA.insertRandomly(meshA, m=1)
-            groupA.add(gA,gA.x,gA.y)
+        gA.insertRandomly(meshA, m=1)
+        groupA.add(gA,gA.x,gA.y)
     for gB in grainsB:
-        for f in range(gB.targetFreq):
-            gB.insertRandomly(meshB, m=1)
-            groupB.add(gB,gB.x,gB.y)
+        gB.insertRandomly(meshB, m=1)
+        groupB.add(gB,gB.x,gB.y)
     for gC in grainsC:
-        for f in range(gC.targetFreq):
-            gC.insertRandomly(meshC, m=1)
-            groupC.add(gC,gC.x,gC.y)
+        gC.insertRandomly(meshC, m=1)
+        groupC.add(gC,gC.x,gC.y)
     for gD in grainsD:
-        for f in range(gD.targetFreq):
-            gD.insertRandomly(meshD, m=1)
-            groupD.add(gD,gD.x,gD.y)
+        gD.insertRandomly(meshD, m=1)
+        groupD.add(gD,gD.x,gD.y)
 except KeyboardInterrupt:
     pass
 
 
-groupA.calcPSD()
-groupB.calcPSD()
-groupC.calcPSD()
-groupD.calcPSD()
+print groupA.details()
+print groupB.details()
+print groupC.details()
+print groupD.details()
+#groupA.plotPSD()
+#groupB.plotPSD()
+#groupC.plotPSD()
+#groupD.plotPSD()
 
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
