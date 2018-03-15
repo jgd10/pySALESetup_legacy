@@ -108,6 +108,8 @@ SDD = pss.SizeDistribution(func='normal',mu=mu2,sigma=sigma)
 
 print SDA.details()
 print SDB.details()
+print SDC.details()
+print SDD.details()
 
 # target area that ALL particles should take up at end
 target_area = float(meshA.Ncells*vfrac)
@@ -137,10 +139,10 @@ for rD,pD in zip(RsD,phiD):
         grainsD.append(gD)
 # library of grains has been generated, now place them into the mesh! 
 
-groupA = pss.Ensemble(meshA)
-groupB = pss.Ensemble(meshB)
-groupC = pss.Ensemble(meshC)
-groupD = pss.Ensemble(meshD)
+groupA = pss.Ensemble(meshA,name='normaldistA_mu=3.6_sg=2.4')
+groupB = pss.Ensemble(meshB,name='normaldistB_mu=3.6_sg=4.8')
+groupC = pss.Ensemble(meshC,name='normaldistC_mu=3.6_sg=1.2')
+groupD = pss.Ensemble(meshD,name='normaldistD_mu=4.6_sg=2.4')
 try:
     i = 0
     for gA in grainsA:
@@ -163,15 +165,15 @@ print groupA.details()
 print groupB.details()
 print groupC.details()
 print groupD.details()
-#groupA.plotPSD()
-#groupB.plotPSD()
-#groupC.plotPSD()
-#groupD.plotPSD()
+groupA.plotPSD()
+groupB.plotPSD()
+groupC.plotPSD()
+groupD.plotPSD()
 
-groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
-groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
-groupC.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
-groupD.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
+groupA.optimise_materials(np.array([1,2,3,4,5,6,7]))
+groupB.optimise_materials(np.array([1,2,3,4,5,6,7]))
+groupC.optimise_materials(np.array([1,2,3,4,5,6,7]))
+groupD.optimise_materials(np.array([1,2,3,4,5,6,7]))
 
 
 meshA.fillAll(-1)
@@ -188,10 +190,15 @@ for xC,yC,gC,mC in zip(groupC.xc,groupC.yc,groupC.grains,groupC.mats):
 for xD,yD,gD,mD in zip(groupD.xc,groupD.yc,groupD.grains,groupD.mats):
     gD.place(xD,yD,mD,meshD)
 
-meshA.fillAll(9)
+meshA.fillAll(8)
 meshB.fillAll(9)
-meshC.fillAll(9)
+meshC.fillAll(8)
 meshD.fillAll(9)
+
+groupA.save()
+groupB.save()
+groupC.save()
+groupD.save()
 
 meshA.blanketVel(+1500.,axis=1)
 meshB.blanketVel(-1500.,axis=1)
@@ -202,9 +209,14 @@ meshAB = pss.combine_meshes(meshA,meshB,axis=1)
 meshCD = pss.combine_meshes(meshC,meshD,axis=1)
 meshAB.top_and_tail()
 meshCD.top_and_tail()
+meshA.viewMats()
+meshB.viewMats()
+meshC.viewMats()
+meshD.viewMats()
 meshAB.viewMats()
 meshCD.viewMats()
-#meshC.save(fname='regolith_circles_v3000.iSALE',compress=True)
+meshAB.save(fname='regolith_PSD_AB.iSALE',compress=True)
+meshCD.save(fname='regolith_PSD_CD.iSALE',compress=True)
 #meshC.multiplyVels()
 #meshC.save(fname='regolith_circles_v1500.iSALE',compress=True)
 #meshC.multiplyVels()
