@@ -24,17 +24,19 @@ group.optimise_materials([3,4,5,6,7,8,9])
 
 # create apparatus instances of the impactor and buffer plates
 impactor = pss.Apparatus(xcoords=[0.,0.,1.e-3,1.e-3], ycoords=[3.e-3,5.e-3,5.e-3,3.e-3])
-bufferplate = pss.Apparatus(xcoords=[0.,0.,1.e-3,1.e-3], ycoords=[2.e-4,1.e-3,1.e-3,2.e-4])
+bufferplate = pss.Apparatus(xcoords=[0.,0.,1.e-3,1.e-3], ycoords=[0.,1.e-3,1.e-3,0.])
 # place impactor into mesh m as material 2
 impactor.place(m,1)
 # use mesh class to assign impactor a vertical velocity of -500 m/s to impactor
 m.matVel(-500.,1)
 # place buffer into mesh m also as material 1
 bufferplate.place(m,1)
+# trims the top and bottom 10 cells from the sim
+m.top_and_tail(10)
 
 # view the mesh materials
 m.viewMats(save=True)
 # view the mesh velocities
-m.viewVels()
+m.viewVels(save=True)
 # save the mesh as an input file for use with iSALE
 #m.save()
