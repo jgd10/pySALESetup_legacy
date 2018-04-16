@@ -1339,11 +1339,16 @@ class Mesh:
 
     def matrixPorosity(self,matrix,bulk,void=False,Print=True):
         """
-        calculate sthe necessary matrix porosity to achieve a target bulk porosity
+        calculates the necessary matrix porosity to achieve a target bulk porosity
         given current domain occupance.
+        Args:
+            matrix: int; material number of the matrix
+            bulk:   float; bulk porosity (e.g. bulk = 0.5 --50% porous--)
+            void:   bool; is there explicit void in the mesh? True/False
+            Print:  bool; if True print out the result, if false, just return the result
         """
-        # bulk porosity must be taken as a percentage!
-        bulk /= 100.
+        # if bulk porosity a percentage, convert to fraction < 1 and >= 0
+        if bulk >= 1.: bulk /= 100.
         matrix_vol = self.calcVol(matrix)
         other = list(self.mats)
         other.remove(matrix)
@@ -1386,6 +1391,7 @@ class Mesh:
         """
         self.checkVels()
         ncells = self.x*self.y
+        print self.x,self.y
         if info:
             OI    = np.zeros((ncells))
             PI    = np.zeros((ncells))
