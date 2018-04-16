@@ -48,12 +48,16 @@ for i in range(150):
 
 # Calculate the optimal material number distribution for 
 # each group individually.
-group1.optimise_materials(np.array([1,2,3,4,5,6,7]))
-group2.optimise_materials(np.array([1,2,3,4,5,6,7]))
+group1.optimise_materials(np.array([1,2,3,4,5,6,7]),populate=True)
+group2.optimise_materials(np.array([1,2,3,4,5,6,7]),populate=True)
 
-# delete all material in each domain
-mesh1.fillAll(-1)
-mesh2.fillAll(-1)
+
+## delete all material in each domain
+#mesh1.fillAll(-1)
+#mesh2.fillAll(-1)
+#
+#mesh1 = pss.populateMesh(mesh1,group1)
+#mesh2 = pss.populateMesh(mesh2,group2)
 
 # use information stored in group1 and group2 to repopulate domain
 # except NOW we can use the optimal materials from optimise_materials!
@@ -61,7 +65,6 @@ for x,y,g,m in zip(group1.xc,group1.yc,group1.grains,group1.mats):
     g.place(x,y,m,mesh1)
 for x,y,g,m in zip(group2.xc,group2.yc,group2.grains,group2.mats):
     g.place(x,y,m,mesh2)
-
 # add an elliptical shroud over each grain
 for x1,y1,g1,x2,y2,g2 in zip(group1.xc,group1.yc,group1.grains,group2.xc,group2.yc,group2.grains):
     # increase grain radius

@@ -49,6 +49,7 @@ def combine_meshes(mesh2,mesh1,axis=1):
     if axis == 1: 
         Yw = mesh1.y + mesh2.y
         Xw = mesh1.x
+    # cellsize and mixed not important here because all material already placed and output is independent of cellsize
     New = Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False)
     New.materials = np.concatenate((mesh1.materials,mesh2.materials),axis=1+axis)
     New.mesh = np.concatenate((mesh1.mesh,mesh2.mesh),axis=axis)
@@ -56,6 +57,16 @@ def combine_meshes(mesh2,mesh1,axis=1):
     New.VY = np.concatenate((mesh1.VY,mesh2.VY),axis=axis)
 
     return New
+
+def populateMesh(mesh,ensemble):
+    """
+    Populate a mesh, given an Ensemble.
+    """
+    # use information stored in the ensemble to repopulate domain
+    # except NOW we can use the optimal materials from optimise_materials!
+    for x,y,g,m in zip(ensemble.xc,ensemble.yc,ensemble.grains,ensemble.mats):
+        g.place(x,y,m,mesh)
+    return mesh
 
 def MeshfromPSSFILE(fname='meso_m.iSALE.gz',cellsize=2.e-6,NumMats=9):
     """
@@ -363,7 +374,7 @@ class Grain:
         ax.imshow(self.mesh,cmap='binary')
         ax.set_xlabel('x [cells]')
         ax.set_ylabel('y [cells]')
-        fig.show()
+        plt.show()
         ax.cla()
         
     def _cropGrain(self,x,y,LX,LY):
@@ -488,19 +499,27 @@ class Grain:
         self.hostmesh = target
 
 
-    def insertRandomly(self,target,m,xbounds=None,ybounds=None):
+    def insertRandomly(self,target,m,xbounds=None,ybounds=None,nooverlap=False):
         """
         insert grain into bed in an empty space. By default select from whole mesh, 
         alternatively, choose coords from region bounded by xbounds = [xmin,xmax] and 
         ybounds = [ymin,ymax]. Position is defined by grain CENTRE
-        so overlap with box boundaries is allowed.
+        so overlap with box boundaries is allowed. If no overlap wanted, reduce box size
+        within function.
 
         Args:
             target:  Mesh
             m:       int; material number
             xbounds: list
             ybounds: list
+            nooverlap: bool
         """
+        if nooverlap and ybounds is not None: 
+            ybounds[0] += self.radius*target.cellsize
+            ybounds[1] -= self.radius*target.cellsize
+        if nooverlap and xbounds is not None: 
+            xbounds[0] += self.radius*target.cellsize
+            xbounds[1] -= self.radius*target.cellsize
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
         box = None
@@ -570,7 +589,7 @@ class Grain:
                                                                         
         if (overlapping_cells > overlap_max):
             nospace = True
-        elif(overlapping_cells == 0):
+        elif (overlapping_cells == 0):
             pass
         return nospace, overlapping_cells
 
@@ -881,7 +900,7 @@ class Ensemble:
         ensemble_area = _vfrac()*self.hostmesh.area
         self.area_weights = [100.*a/ensemble_area for a in self.areas]
     
-    def optimise_materials(self,mats=np.array([1,2,3,4,5,6,7,8,9])):                        
+    def optimise_materials(self,mats=np.array([1,2,3,4,5,6,7,8,9]),populate=True,target=None):                        
         """
         This function has the greatest success and is based on that used in JP Borg's work 
         with CTH.
@@ -915,6 +934,7 @@ class Ensemble:
         Returns:
             MAT:  array; containg an optimal material number for each grain
         """
+        if type(mats) == list: mats = np.array(mats)
         # No. of particles
         N    = self.number                                                               
         M    = len(mats)
@@ -973,6 +993,11 @@ class Ensemble:
             # Increment i
             i += 1                                                                       
         self.mats = list(MAT.astype(int))
+        if populate: 
+            target = self.hostmesh
+            if target is not None: mesh = target
+            target.fillAll(-1)
+            target = populateMesh(target,self)
         return 
 
     def fabricTensor_discs(self,tolerance=0.):
@@ -1292,6 +1317,23 @@ class Mesh:
             self.VX *= multiplier
             self.VY *= multiplier
 
+    def matVel(self,vel,mat,axis=1):
+        """
+        Assign a blanket velocity to one material 
+        Useful before merging meshes or when using other objects in iSALE.
+        """
+        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
+        matpresence = self.materials[mat-1]
+
+        if axis == 0:
+            self.VX[matpresence==1.] = vel
+        elif axis == 1:
+            self.VY[matpresence==1.] = vel
+        elif axis == 2:
+            assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
+            self.VX[matpresence==1.] = vel[0]
+            self.VY[matpresence==1.] = vel[1]
+
     def blanketVel(self,vel,axis=1):
         """
         Assign a blanket velocity to whole domain. 
@@ -1336,6 +1378,25 @@ class Mesh:
         else:
             pass
         return Vol
+
+    def vfrac(self,xbounds=None,ybounds=None):
+        """
+        Calculate the volume fraction of material within a user-specified box
+        """
+        box = np.sum(self.materials,axis=0)
+        if xbounds is None and ybounds is not None:
+            # ensure all cells in box outside of ymin and ymax won't be considered
+            condition = (self.yy>ybounds[0])*(self.yy<ybounds[1])
+        elif ybounds is None and xbounds is not None:
+            # ensure all cells in box outside of xmin and xmax won't be considered
+            condition = (self.xx>xbounds[0])*(self.xx<xbounds[1])
+        elif xbounds is not None and ybounds is not None:
+            # Same proceedure if both given
+            condition = (self.xx>xbounds[0])*(self.xx<xbounds[1])*(self.yy>ybounds[0])*(self.yy<ybounds[1])
+        
+        vf = float(np.sum(box[condition]))/np.size(box[condition])
+        return vf
+
 
     def matrixPorosity(self,matrix,bulk,void=False,Print=True):
         """
