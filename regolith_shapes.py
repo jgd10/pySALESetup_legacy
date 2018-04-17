@@ -82,8 +82,8 @@ for r,p in zip(Rs,phi):
 # order grains from largest to smallest
 grains = [g for _,g in sorted(zip(phi,grains))]
 
-groupA = pss.Ensemble(meshA)
-groupB = pss.Ensemble(meshB)
+groupA = pss.Ensemble(meshA,name='shapevariationENS_A')
+groupB = pss.Ensemble(meshB,name='shapevariationENS_B')
 try:
     i = 0
     for g in grains:
@@ -102,6 +102,9 @@ groupA.calcPSD()
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]))
 
+groupA.save()
+groupB.save()
+
 
 meshA.fillAll(-1)
 meshB.fillAll(-1)
@@ -113,8 +116,8 @@ for xA,yA,gA,mA,xB,yB,gB,mB in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats
 meshA.fillAll(9)
 meshB.fillAll(9)
 
-meshA.blanketVel(+1500.,axis=1)
-meshB.blanketVel(-1500.,axis=1)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
 
 meshC = pss.combine_meshes(meshA,meshB,axis=1)
 meshC.top_and_tail()
@@ -142,16 +145,16 @@ R = [[-1.,-1.],
 R[2][1] += off
 
 for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
-    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r*3)
+    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r)
     grain1.place(xA,yA,mA,meshA)
 for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
-    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r)
+    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r*3)
     grain2.place(xB,yB,mB,meshB)
 
 meshA.fillAll(9)
 meshB.fillAll(9)
-meshA.blanketVel(+1500.,axis=1)
-meshB.blanketVel(-1500.,axis=1)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
 meshD = pss.combine_meshes(meshA,meshB,axis=1)
 meshD.top_and_tail()
 meshD.viewMats()
@@ -185,8 +188,8 @@ for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
 
 meshA.fillAll(9)
 meshB.fillAll(9)
-meshA.blanketVel(+1500.,axis=1)
-meshB.blanketVel(-1500.,axis=1)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
 meshE = pss.combine_meshes(meshA,meshB,axis=1)
 meshE.top_and_tail()
 meshE.viewMats()
@@ -211,16 +214,16 @@ R = [[-1.,-1.],
 
 
 for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
-    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r*3)
+    grain1 = pss.Grain(eqr=gA.radius,shape='polygon',poly_params=R,rot=r)
     grain1.place(xA,yA,mA,meshA)
 for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
-    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r)
+    grain2 = pss.Grain(eqr=gB.radius,shape='polygon',poly_params=R,rot=r*3)
     grain2.place(xB,yB,mB,meshB)
 
 meshA.fillAll(9)
 meshB.fillAll(9)
-meshA.blanketVel(+1500.,axis=1)
-meshB.blanketVel(-1500.,axis=1)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
 meshF = pss.combine_meshes(meshA,meshB,axis=1)
 meshF.top_and_tail()
 meshF.viewMats()
@@ -229,3 +232,34 @@ meshF.multiplyVels()
 meshF.save(fname='regolith_triangle_v1500.iSALE',compress=True)
 meshF.multiplyVels()
 meshF.save(fname='regolith_triangle_v750.iSALE',compress=True)
+
+meshA.fillAll(-1)
+meshB.fillAll(-1)
+
+import glob
+import random
+
+allfiles = glob.glob('./grain_library/grain_area*.txt')
+
+for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
+    fff = random.choice(allfiles)
+    grain1 = pss.Grain(eqr=gA.radius,shape='file',File=fff)
+    grain1.place(xA,yA,mA,meshA)
+
+for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
+    fff = random.choice(allfiles)
+    grain2 = pss.Grain(eqr=gB.radius,shape='file',File=fff)
+    grain2.place(xB,yB,mB,meshB)
+
+meshA.fillAll(9)
+meshB.fillAll(9)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
+meshG = pss.combine_meshes(meshA,meshB,axis=1)
+meshG.top_and_tail()
+meshG.viewMats()
+meshG.save(fname='regolith_realistic_v3000.iSALE',compress=True)
+meshG.multiplyVels()
+meshG.save(fname='regolith_realistic_v1500.iSALE',compress=True)
+meshG.multiplyVels()
+meshG.save(fname='regolith_realistic_v750.iSALE',compress=True)

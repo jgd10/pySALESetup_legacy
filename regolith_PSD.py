@@ -161,14 +161,6 @@ except KeyboardInterrupt:
     pass
 
 
-print groupA.details()
-print groupB.details()
-print groupC.details()
-print groupD.details()
-groupA.plotPSD()
-groupB.plotPSD()
-groupC.plotPSD()
-groupD.plotPSD()
 
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7]))
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7]))
@@ -195,15 +187,29 @@ meshB.fillAll(9)
 meshC.fillAll(8)
 meshD.fillAll(9)
 
+meshA.matrixPorosity(8,0.5,Print=True) 
+print groupA.details()
+meshB.matrixPorosity(9,0.5,Print=True) 
+print groupB.details()
+meshC.matrixPorosity(8,0.5,Print=True) 
+print groupC.details()
+meshD.matrixPorosity(9,0.5,Print=True) 
+print groupD.details()
+
+groupA.plotPSD()
+groupB.plotPSD()
+groupC.plotPSD()
+groupD.plotPSD()
+
 groupA.save()
 groupB.save()
 groupC.save()
 groupD.save()
 
-meshA.blanketVel(+1500.,axis=1)
-meshB.blanketVel(-1500.,axis=1)
-meshC.blanketVel(+1500.,axis=1)
-meshD.blanketVel(-1500.,axis=1)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
+meshC.blanketVel(-1500.,axis=1)
+meshD.blanketVel(+1500.,axis=1)
 
 meshAB = pss.combine_meshes(meshA,meshB,axis=1)
 meshCD = pss.combine_meshes(meshC,meshD,axis=1)
