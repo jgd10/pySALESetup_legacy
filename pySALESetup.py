@@ -434,7 +434,7 @@ class Grain:
         j_ = [j_edge,j_finl]
         return Is,Js,i_,j_
 
-    def place(self,x,y,m,target,num=None):
+    def place(self,x,y,m,target,num=None,targets=None):
         """
         Inserts the shape into the correct materials mesh at coordinate x, y.
         
@@ -443,6 +443,9 @@ class Grain:
             m      : int; this is the index of the material
             target : Mesh; the target mesh, must be a 'Mesh' instance
             num    : int; the 'number' of the particle.
+
+        if m == -1 then void is inserted, overwriting all existing material
+        if m == 0  then void is inserted, ONLY overwriting materials specified in targets
         
         existing material takes preference and is not displaced
 
@@ -452,6 +455,8 @@ class Grain:
             assert num is None, "ERROR: Particle number not yet supported in mixed-cell systems"
         else:
             if num is None: num = 1.
+        if num == 0:
+            assert targets is not None, "ERROR: When creating void pores targets material(s) must be set"
         assert type(x)==type(y), "ERROR: x and y coords must have the same type"
         assert abs(m) > 0, "ERROR: material number must not be 0. -1 is void."
         self.x = x
@@ -476,6 +481,11 @@ class Grain:
                         if m == -1: 
                             target.materials[:,o+i_[0],p+j_[0]] = 0.
                             target.mesh[o+i_[0],p+j_[0]] = 0.
+                        elif m == 0:
+                            for tm in targets:
+                                if target.materials[tm,o+i_[0],p+j_[0] != 0.: 
+                                    target.mesh[o+i_[0],p+j_[0]] = 0.
+                                target.materials[tm,o+i_[0],p+j_[0]] = 0.
                         elif m > 0 and np.sum(target.materials[:,o+i_[0],p+j_[0]]) == 0.:
                             target.materials[m-1,o+i_[0],p+j_[0]] = 1.
                             target.mesh[o+i_[0],p+j_[0]] = num
@@ -499,7 +509,7 @@ class Grain:
         self.hostmesh = target
 
 
-    def insertRandomly(self,target,m,xbounds=None,ybounds=None,nooverlap=False):
+    def insertRandomly(self,target,m,xbounds=None,ybounds=None,nooverlap=False,mattargets):
         """
         insert grain into bed in an empty space. By default select from whole mesh, 
         alternatively, choose coords from region bounded by xbounds = [xmin,xmax] and 
@@ -514,6 +524,8 @@ class Grain:
             ybounds: list
             nooverlap: bool
         """
+        if m == 0:
+            assert mattargets is not None, "When inserting void that does not overwrite everything, the materials to be overwritten must be specified in mattargets"
         if nooverlap and ybounds is not None: 
             ybounds[0] += self.radius*target.cellsize
             ybounds[1] -= self.radius*target.cellsize
@@ -555,7 +567,10 @@ class Grain:
         if nospace:
             pass
         else:
-            self.place(x,y,m,target)
+            if m == 0:
+                self.place(x,y,m,target)
+            else:
+                self.place(x,y,m,target,targets=mattargets)
         return 
     def _checkCoords(self,x,y,target,overlap_max=0.): 
         """
@@ -593,7 +608,7 @@ class Grain:
             pass
         return nospace, overlapping_cells
 
-    def insertRandomwalk(self,target,m,xbounds=None,ybounds=None):
+    def insertRandomwalk(self,target,m,xbounds=None,ybounds=None,mattargets=None):
         """
         Similar to insertRandomly. Randomly walk until allowed contact established and place
         Initial coordinates taken from box and on a void cell
@@ -609,6 +624,8 @@ class Grain:
             xbounds: list
             ybounds: list
         """
+        if m == 0:
+            assert mattargets is not None, "When inserting void that does not overwrite everything, the materials to be overwritten must be specified in mattargets"
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
         box = None
@@ -678,7 +695,10 @@ class Grain:
             self.x = x
             self.y = y
             self.mat = m
-            self.place(x,y,m,target)
+            if m == 0:
+                self.place(x,y,m,target)
+            else:
+                self.place(x,y,m,target,targets=mattargets)
         return
 
     def save(self):
