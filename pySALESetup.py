@@ -434,7 +434,7 @@ class Grain:
         j_ = [j_edge,j_finl]
         return Is,Js,i_,j_
 
-    def place(self,x,y,m,target,num=None,targets=None):
+    def place(self,x,y,m,target,num=None,mattargets=None):
         """
         Inserts the shape into the correct materials mesh at coordinate x, y.
         
@@ -455,10 +455,8 @@ class Grain:
             assert num is None, "ERROR: Particle number not yet supported in mixed-cell systems"
         else:
             if num is None: num = 1.
-        if num == 0:
-            assert targets is not None, "ERROR: When creating void pores targets material(s) must be set"
+        if m == 0: assert mattargets is not None, "ERROR: When creating void pores targets material(s) must be set"
         assert type(x)==type(y), "ERROR: x and y coords must have the same type"
-        assert abs(m) > 0, "ERROR: material number must not be 0. -1 is void."
         self.x = x
         self.y = y
         self.mat = m
@@ -482,10 +480,10 @@ class Grain:
                             target.materials[:,o+i_[0],p+j_[0]] = 0.
                             target.mesh[o+i_[0],p+j_[0]] = 0.
                         elif m == 0:
-                            for tm in targets:
-                                if target.materials[tm,o+i_[0],p+j_[0] != 0.: 
+                            for tm in mattargets:
+                                if target.materials[tm-1,o+i_[0],p+j_[0]] != 0.: 
                                     target.mesh[o+i_[0],p+j_[0]] = 0.
-                                target.materials[tm,o+i_[0],p+j_[0]] = 0.
+                                target.materials[tm-1,o+i_[0],p+j_[0]] = 0.
                         elif m > 0 and np.sum(target.materials[:,o+i_[0],p+j_[0]]) == 0.:
                             target.materials[m-1,o+i_[0],p+j_[0]] = 1.
                             target.mesh[o+i_[0],p+j_[0]] = num
@@ -509,7 +507,7 @@ class Grain:
         self.hostmesh = target
 
 
-    def insertRandomly(self,target,m,xbounds=None,ybounds=None,nooverlap=False,mattargets):
+    def insertRandomly(self,target,m,xbounds=None,ybounds=None,nooverlap=False,mattargets=None):
         """
         insert grain into bed in an empty space. By default select from whole mesh, 
         alternatively, choose coords from region bounded by xbounds = [xmin,xmax] and 
@@ -535,7 +533,18 @@ class Grain:
         target.mesh = np.sum(target.materials,axis=0)
         target.mesh[target.mesh>1.] = 1.
         box = None
-        box = np.sum(target.materials,axis=0)
+        # If NOT overwriting everything we want to place pores in regions of target material
+        # OR void! (if any is present) but NOT over material we are not overwriting. To form the
+        # box we select coords from, target material & void should be 0.
+        if m == 0:
+            box = np.zeros_like(target.mesh)
+            for ii in range(9):
+                if np.isin(ii+1,mattargets):
+                    pass
+                else:
+                    box += target.materials[ii]
+        else:
+            box = np.sum(target.materials,axis=0)
         if xbounds is None and ybounds is not None:
             # ensure all cells in box outside of ymin and ymax won't be considered
             box[(target.yy>ybounds[1])] = 9999.
@@ -555,9 +564,17 @@ class Grain:
         passes  = 0
         indices = np.where(box==0.)
         indices = np.column_stack(indices)
+        if len(indices)==0.:
+            fig = plt.figure()
+            ax = fig.add_subplot(111,aspect='equal')
+            ax.imshow(box,vmin=0,vmax=1)
+            plt.show()
+
+        pore = False
+        if m==0: pore = True
         while nospace:
             x,y   = random.choice(indices)
-            nospace, overlap = self._checkCoords(x,y,target)
+            nospace, overlap = self._checkCoords(x,y,target,pore=pore)
             counter += 1
             if counter>10000:
                 nospace = True
@@ -568,44 +585,49 @@ class Grain:
             pass
         else:
             if m == 0:
-                self.place(x,y,m,target)
+                self.place(x,y,m,target,mattargets=mattargets)
             else:
-                self.place(x,y,m,target,targets=mattargets)
+                self.place(x,y,m,target)
         return 
-    def _checkCoords(self,x,y,target,overlap_max=0.): 
+    def _checkCoords(self,x,y,target,overlap_max=0.,pore=False): 
         """
         Checks if the grain will overlap with any other material;
         and if it can be placed.
         
         It works by initially checking the location of the generated coords and 
         ammending them if the shape overlaps the edge of the mesh. Then the two arrays
-        can be compared.
+        can be compared. If a pore is being placed it does not need to check anything
+        void overlapping with void or other material is not an issue because the materials
+        allowed to be overwritten are already specified.
         
         Args:
             x:                 float; The x coord of the shape's origin
             y:                 float; The equivalent y coord
             target:            Mesh; 
             overlap_max:       float; maximum number of overlapping cells allowed
+            pore:              bool; are the coordinates of a pore being checked?
         Returns:
             nospace:           boolean;
             overlapping_cells: float; number of cells that overlap with other grains
 
         the value of nospace is returned. False is a failure, True is success.
         """
-        #cell_limit = (np.pi*float(cppr_max)**2.)/100.  
         nospace = False             
-        Is,Js,i_,j_ = self._cropGrain(x,y,target.x,target.y)
-        
-        temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])
-        temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])
-        test       = np.minimum(temp_shape,temp_mesh)
+        if pore is not True:
+            Is,Js,i_,j_ = self._cropGrain(x,y,target.x,target.y)
+            
+            temp_shape = np.copy(self.mesh[Is[0]:Is[1],Js[0]:Js[1]])
+            temp_mesh  = np.copy(target.mesh[i_[0]:i_[1],j_[0]:j_[1]])
+            test       = np.minimum(temp_shape,temp_mesh)
 
-        overlapping_cells = np.sum(test)
-                                                                        
-        if (overlapping_cells > overlap_max):
-            nospace = True
-        elif (overlapping_cells == 0):
-            pass
+            overlapping_cells = np.sum(test)
+                                                                            
+            if (overlapping_cells > overlap_max):
+                nospace = True
+            elif (overlapping_cells == 0):
+                pass
+        else:
+            overlapping_cells = 0.
         return nospace, overlapping_cells
 
     def insertRandomwalk(self,target,m,xbounds=None,ybounds=None,mattargets=None):
@@ -696,9 +718,9 @@ class Grain:
             self.y = y
             self.mat = m
             if m == 0:
-                self.place(x,y,m,target)
-            else:
                 self.place(x,y,m,target,targets=mattargets)
+            else:
+                self.place(x,y,m,target)
         return
 
     def save(self):
@@ -1383,7 +1405,7 @@ class Mesh:
             self.VX[(self.yy>=ymin)*(self.yy<=ymax)] = vel[0]
             self.VY[(self.yy>=ymin)*(self.yy<=ymax)] = vel[1]
 
-    def calcVol(self,m=None):
+    def calcVol(self,m=None,frac=False):
         """
         Calculate area of non-void in domain for material(s) m. 
         """
@@ -1397,6 +1419,7 @@ class Mesh:
                 Vol += np.sum(self.materials[mm-1])
         else:
             pass
+        if frac: Vol /= float(self.Ncells)
         return Vol
 
     def vfrac(self,xbounds=None,ybounds=None):
@@ -1444,7 +1467,8 @@ class Mesh:
         matrix_por = (matrix_vol - remain_vol)/float(matrix_vol)
         if Print:
             distension = 1./(1.-matrix_por)
-            print "porosity = {:3.3f}% and distension = {:3.3f}".format(matrix_por*100.,distension)
+            print "bulk porosity = {:3.3f}%".format(bulk*100.)
+            print "Matrix: porosity = {:3.3f}% and distension = {:3.3f}".format(matrix_por*100.,distension)
         return matrix_por*100.
 
 
