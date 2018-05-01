@@ -11,6 +11,61 @@ import matplotlib.path   as mpath
 from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+def quickFill(grain,target,volfrac,ensemble,
+        material=1,method='insertion',xbnds=None,ybnds=None,nooverlap=False,mattargets=None):
+    """
+    Fills a region of mesh with the same grain instance. Most input values are identical to insertRandomly/insertRandomwalk
+    because of this.
+    Function does not have compatability with a material number of 0 yet, but it does work with -1. I.e. it can handle
+    complete overwriting but not selective overwriting.
+    
+    Args:
+        grain: Grain instance
+        target: Mesh instance
+        volfrac: float
+        ensemble: Ensemble instance
+        material: integer is one of -1, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        method: string
+        xbnds: list (len == 2)  or None
+        ybnds: list (len == 2)  or None
+        nooverlap: bool
+        mattargets: list or None
+    Returns:
+        Nothing returned
+
+    """
+    assert method == 'insertion' or method == 'random walk', 'ERROR: quickFill only supports insertion and random walk methods'
+    assert material != 0, 'ERROR: function does not have advanced pore creation capability yet. This is to be integrated at a later date'
+    if xbnds is None: xbnds = target._setboundsWholemesh(axis=0)
+    if ybnds is None: ybnds = target._setboundsWholemesh(axis=1)
+    # Set current volume fraction
+    if material == -1 or material == 0: 
+        current_volume_fraction = 1.-target.vfrac(xbounds=xbnds[:],ybounds=ybnds[:])
+    else:
+        current_volume_fraction = target.vfrac(xbounds=xbnds[:],ybounds=ybnds[:])
+
+    if material == 0:
+        pass
+        # advanced pore-creation capability has not yet been integrated into this function
+        # more will be added at a later date.
+
+    # insert grains until target volume fraction achieved
+    while current_volume_fraction <= volfrac:
+        # insert randomly into a specified region as material 1 for now
+        if method == 'insertion':
+            grain.insertRandomly(target,material,xbounds=xbnds[:],ybounds=ybnds[:],nooverlap=nooverlap)
+        elif method == 'random walk':
+            grain.insertRandomwalk(target,material,xbounds=xbnds[:],ybounds=ybnds[:])
+        # add Grain instance to Ensemble
+        ensemble.add(grain)
+        # calculate the new volume fraction in the new region
+        prev_vfrac=current_volume_fraction
+        if material == -1 or material == 0:
+           current_volume_fraction = 1. -  target.vfrac(xbounds=xbnds[:],ybounds=ybnds[:])
+        else:
+           current_volume_fraction = target.vfrac(xbounds=xbnds[:],ybounds=ybnds[:])
+    return 
+
 def polygon_area(X,Y):
     """
     Returns exact area of a polygon
@@ -564,12 +619,7 @@ class Grain:
         passes  = 0
         indices = np.where(box==0.)
         indices = np.column_stack(indices)
-        if len(indices)==0.:
-            fig = plt.figure()
-            ax = fig.add_subplot(111,aspect='equal')
-            ax.imshow(box,vmin=0,vmax=1)
-            plt.show()
-
+        assert len(indices) > 0, 'ERROR: domain is completely full of material; no more space can be found'
         pore = False
         if m==0: pore = True
         while nospace:
@@ -1170,6 +1220,7 @@ class Mesh:
         self.mats = range(1,9+1)
         self.mixed = mixed
 
+
     def checkVels(self):
         """
         Ensures no void cells have velocities.
@@ -1609,6 +1660,13 @@ class Mesh:
                     pass
         
         return FRAC
+    
+    def _setboundsWholemesh(self,axis):
+        if axis == 0:
+            bounds = [np.amin(self.xx),np.amax(self.xx)]
+        elif axis == 1:
+            bounds = [np.amin(self.xx),np.amax(self.xx)]
+        return bounds
         
 class Apparatus:
     """
