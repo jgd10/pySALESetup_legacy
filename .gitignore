@@ -3,5 +3,6 @@
 */pySALESetup.py
 *.pyc
 *.txt
+*.png
 !docs/*.txt
 *.obj
