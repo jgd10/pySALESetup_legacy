@@ -83,7 +83,7 @@ for r,p in zip(Rs,phi):
 grains = [g for _,g in sorted(zip(phi,grains))]
 
 
-vf_V = np.array([0.,0.05,0.1,0.15,0.2,0.25])
+vf_V = np.array([0.,0.125,0.25])
 vf_V = vf_V[::-1]
 # matrix porosity = 0.5
 #vf_G = 5.*vf_V
@@ -128,7 +128,8 @@ for v_void,v_grain in zip(vf_V,vf_G):
                 g.insertRandomly(meshB, m=1)
                 groupBG.add(g,g.x,g.y)
                 vfB = meshB.calcVol(frac=True)
-                if vfB > v_grain: break
+                if vfB > v_grain: 
+                    break
             j+= 1
 
         meshA.fillAll(2)
@@ -163,8 +164,10 @@ for v_void,v_grain in zip(vf_V,vf_G):
         vfB = meshB.calcVol(frac=True)
         if vfB > v_grain: break
     
+    print meshA.details()
     meshA.fillAll(9)
     meshB.fillAll(9)
+    print meshA.details()
     
     for xA,yA,gA in zip(groupAV.xc,groupAV.yc,groupAV.grains):
         gA.place(xA,yA,0,meshA,mattargets=[9])
@@ -179,6 +182,7 @@ for v_void,v_grain in zip(vf_V,vf_G):
         groupBG.save()
         groupAV.save()
         groupBV.save()
+    print meshA.details()
     
     meshA.blanketVel(-1500.,axis=1)
     meshB.blanketVel(+1500.,axis=1)
