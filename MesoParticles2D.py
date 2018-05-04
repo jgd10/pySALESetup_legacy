@@ -7,17 +7,19 @@ m = pss.Mesh(X=100,Y=500,cellsize=10.e-6)
 # no rotation (normally in radians)
 # and circular shape. Other parameters are required for other shapes
 g = pss.Grain(eqr=5.,rot=0.,shape='circle')
-
+# create an ensemble instance to be populated
+group = pss.Ensemble(m)
 volume_fraction = 0.
 # insert grains until target volume fraction achieved
-group = pss.Ensemble(m)
-while volume_fraction <= 0.4:
-    # insert randomly into a specified region as material 1 for now
-    g.insertRandomly(m,2,ybounds=[1.e-3,3.e-3],nooverlap=True)
-    # add Grain instance to Ensemble
-    group.add(g)
-    # calculate the new volume fraction in the new region
-    volume_fraction = m.vfrac(ybounds=[1.e-3,3.e-3])
+#while volume_fraction <= 0.4:
+#    # insert randomly into a specified region as material 1 for now
+#    g.insertRandomly(m,2,ybounds=[1.e-3,3.e-3],nooverlap=True)
+#    # add Grain instance to Ensemble
+#    group.add(g)
+#    # calculate the new volume fraction in the new region
+#    prev_vfrac = volume_fraction
+#    volume_fraction = m.vfrac(ybounds=[1.e-3,3.e-3])
+pss.quickFill(g,m,0.4,group,material=2,method='insertion',ybnds=[1.e-3,3.e-3],nooverlap=True)
 
 # optimise materials using those not yet used
 group.optimise_materials([3,4,5,6,7,8,9])
