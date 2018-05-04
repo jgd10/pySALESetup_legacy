@@ -1190,7 +1190,7 @@ class Mesh:
     which include both x and y component fields, and the 'mesh' field. This acts like a test
     domain with only one material field and is mostly used internally.
     """
-    def __init__(self,X=500,Y=500,cellsize=2.e-6,mixed=False):
+    def __init__(self,X=500,Y=500,cellsize=2.e-6,mixed=False,label='None'):
         """
         Initialise the Mesh class. Defaults are typical for mesoscale setups which this module
         was originally designed for.
@@ -1219,6 +1219,7 @@ class Mesh:
         self.NoMats = 9
         self.mats = range(1,9+1)
         self.mixed = mixed
+        self.name = label
 
 
     def checkVels(self):
