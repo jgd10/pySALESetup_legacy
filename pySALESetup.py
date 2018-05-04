@@ -1321,6 +1321,27 @@ class Mesh:
         ax.set_ylabel('$y$ [cells]')
         if save: fig.savefig(fname,bbox_inches='tight',dpi=300)
         plt.show()
+    
+    def flipMesh(self,axis=1):
+        """
+        `Flip' the Mesh instance along either the horizontal (axis=0) or vertical
+        (axis=1) axes. Alternatively, this can flip the material order with 
+        axis = -1 (this does not change anything else).
+        """
+        if axis == 0:
+            self.materials = self.materials[:,::-1,:]
+            self.mesh = self.mesh[::-1,:]
+            self.VX = self.VX[::-1,:]
+            self.VY = self.VY[::-1,:]
+        elif axis == 1:
+            self.materials = self.materials[:,:,::-1]
+            self.mesh = self.mesh[:,::-1]
+            self.VX = self.VX[:,::-1]
+            self.VY = self.VY[:,::-1]
+        elif axis == -1:
+            self.materials = self.materials[::-1,:,:]
+        return
+
 
     def top_and_tail(self,num=3,axis=1):
         """
