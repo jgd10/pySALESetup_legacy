@@ -40,6 +40,8 @@ def DD_(x):
 # Top and bottom mesh created separately
 meshA = pss.Mesh(X=500,Y=1200,cellsize=2.5e-6)
 meshB = pss.Mesh(X=500,Y=1200,cellsize=2.5e-6)
+#meshA = pss.Mesh(X=50,Y=120,cellsize=2.5e-5,label='A')
+#meshB = pss.Mesh(X=50,Y=120,cellsize=2.5e-5,label='B')
 meshA.label='A'
 meshB.label='B'
 
@@ -61,6 +63,7 @@ N = 10
 phi     = np.linspace(minphi,maxphi,N)
 
 Rs = ((DD_(phi)*.5*1.e-3)/meshA.cellsize)
+#Rs = np.ones((N))*4
 
 # interval over which to calculate number from pdf
 # No. = |CDF(x+h) - CDF(x-h)| * no. of areas
@@ -164,10 +167,8 @@ for v_void,v_grain in zip(vf_V,vf_G):
         vfB = meshB.calcVol(frac=True)
         if vfB > v_grain: break
     
-    print meshA.details()
     meshA.fillAll(9)
     meshB.fillAll(9)
-    print meshA.details()
     
     for xA,yA,gA in zip(groupAV.xc,groupAV.yc,groupAV.grains):
         gA.place(xA,yA,0,meshA,mattargets=[9])
@@ -182,7 +183,6 @@ for v_void,v_grain in zip(vf_V,vf_G):
         groupBG.save()
         groupAV.save()
         groupBV.save()
-    print meshA.details()
     
     meshA.blanketVel(-1500.,axis=1)
     meshB.blanketVel(+1500.,axis=1)

@@ -105,7 +105,7 @@ def combine_meshes(mesh2,mesh1,axis=1):
         Yw = mesh1.y + mesh2.y
         Xw = mesh1.x
     # cellsize and mixed not important here because all material already placed and output is independent of cellsize
-    New = Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False)
+    New = Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False,label=mesh2.name+mesh1.name)
     New.materials = np.concatenate((mesh1.materials,mesh2.materials),axis=1+axis)
     New.mesh = np.concatenate((mesh1.mesh,mesh2.mesh),axis=axis)
     New.VX = np.concatenate((mesh1.VX,mesh2.VX),axis=axis)
@@ -1039,51 +1039,54 @@ class Ensemble:
         xcARR = np.array(self.xc)
         ycARR = np.array(self.yc)
         # Counts the number of particles that have been assigned
-        i = 0                                                                            
         # Loop every particle and assign each one in turn.    
-        while i < N:                                                                     
-            Ns = max(self.grains[i].Px,self.grains[i].Py)
-            xc = self.xc[i]
-            yc = self.yc[i]
-            # Create a 'box' around each particle (in turn) that is 6Ns x 6Ns
-            lowx   = xc - 3.*Ns*L                                                        
-            higx   = xc + 3.*Ns*L
-            lowy   = yc - 3.*Ns*L
-            higy   = yc + 3.*Ns*L
-            # consider grains in the box that are also NOT the grain being considered!
-            condition =(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)*(self.xc!=xc)*(self.yc!=yc) 
-            # Array containing a list of all material numbers within the 'box' 
-            boxmat =     MAT[condition]                                                  
-            # Array containing the corresponding xcoords
-            boxx   =   xcARR[condition]                                                  
-            # and the ycoords
-            boxy   =   ycARR[condition]                                                  
-            nn     =  np.size(boxmat)
-            # Calculate the distances to the nearest particles
-            D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             
-            # Sort the particles into order of distance from the considered particle
-            ind = np.argsort(D)                                                          
-            # Sort the materials into the corresponding order
-            BXM = boxmat[ind]                                                            
-            # Only select the M closest particles
-            DU  = np.unique(BXM[:M])                                                     
-            if np.array_equal(DU, matsARR):                                              
-                # If the unique elements in this array equate the array of       
-                # materials then all are taken
-                # Set the particle material to be of the one furthest from 
-                # the starting particle
-                mm     = BXM[-1]
-                MAT[i] = mm                                                              
-                # Else there is a material in mats that is NOT in DU
-            else:                                                                        
-                # This finds the indices of all elements that only appear in 
-                # mats and not DU
-                indices = np.in1d(matsARR,DU,invert=True)                                
-                # Randomly select one to be the current particle's material number
-                mm      = np.random.choice(matsARR[indices],1)
-                MAT[i]  = mm                                                             
-            # Increment i
-            i += 1                                                                       
+        # perform the optimisation algorithm 3 times to improve material 
+        # assignment
+        for loop in range(3):
+            i = 0                                                                            
+            while i < N:                                                                     
+                Ns = max(self.grains[i].Px,self.grains[i].Py)
+                xc = self.xc[i]
+                yc = self.yc[i]
+                # Create a 'box' around each particle (in turn) that is 6Ns x 6Ns
+                lowx   = xc - 3.*Ns*L                                                        
+                higx   = xc + 3.*Ns*L
+                lowy   = yc - 3.*Ns*L
+                higy   = yc + 3.*Ns*L
+                # consider grains in the box that are also NOT the grain being considered!
+                condition =(lowx<=self.xc)*(self.xc<=higx)*(lowy<=self.yc)*(self.yc<=higy)*(self.xc!=xc)*(self.yc!=yc) 
+                # Array containing a list of all material numbers within the 'box' 
+                boxmat =     MAT[condition]                                                  
+                # Array containing the corresponding xcoords
+                boxx   =   xcARR[condition]                                                  
+                # and the ycoords
+                boxy   =   ycARR[condition]                                                  
+                nn     =  np.size(boxmat)
+                # Calculate the distances to the nearest particles
+                D   = np.sqrt((boxx - xc)**2. + (boxy - yc)**2.)                             
+                # Sort the particles into order of distance from the considered particle
+                ind = np.argsort(D)                                                          
+                # Sort the materials into the corresponding order
+                BXM = boxmat[ind]                                                            
+                # Only select the M closest particles
+                DU  = np.unique(BXM[:M])                                                     
+                if np.array_equal(DU, matsARR):                                              
+                    # If the unique elements in this array equate the array of       
+                    # materials then all are taken
+                    # Set the particle material to be of the one furthest from 
+                    # the starting particle
+                    mm     = BXM[-1]
+                    MAT[i] = mm                                                              
+                    # Else there is a material in mats that is NOT in DU
+                else:                                                                        
+                    # This finds the indices of all elements that only appear in 
+                    # mats and not DU
+                    indices = np.in1d(matsARR,DU,invert=True)                                
+                    # Randomly select one to be the current particle's material number
+                    mm      = np.random.choice(matsARR[indices],1)
+                    MAT[i]  = mm                                                             
+                # Increment i
+                i += 1                                                                       
         self.mats = list(MAT.astype(int))
         if populate: 
             target = self.hostmesh
@@ -1525,7 +1528,7 @@ class Mesh:
             if np.amax(self.materials[i,:,:])>0: MMM.append(i+1)
         deets += "Materials used: {}\n".format(MMM)
         deets += "Max & Min velocities\n"
-        deets += "Vx: {} m/s & {} m/s".format(np.amax(self.VX),np.amin(self.VX)) 
+        deets += "Vx: {} m/s & {} m/s\n".format(np.amax(self.VX),np.amin(self.VX)) 
         deets += "Vy: {} m/s & {} m/s".format(np.amax(self.VY),np.amin(self.VY))
         return deets
 
@@ -1585,7 +1588,6 @@ class Mesh:
         """
         self.checkVels()
         ncells = self.x*self.y
-        print self.x,self.y
         if info:
             OI    = np.zeros((ncells))
             PI    = np.zeros((ncells))
@@ -1597,8 +1599,8 @@ class Mesh:
         K     = 0
         
         # make list of used material numbers
-        usedmats = list(self.mats)
         # iterate through them all
+        usedmats = self.mats[:]
         for mm in self.mats:
             # If a material hasn't been used...
             total = np.sum(self.materials[mm-1])
