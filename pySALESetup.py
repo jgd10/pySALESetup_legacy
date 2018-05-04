@@ -1511,6 +1511,22 @@ class Mesh:
         
         vf = float(np.sum(box[condition]))/np.size(box[condition])
         return vf
+    
+    def details(self):
+        """
+        creates easily printable string of details of this instance
+        """
+        deets  = "Mesh instance called {}\n".format(self.name)
+        deets += "Domain size: {} x {}\n".format(self.x,self.y)
+        deets += "Cell size: {} m\n".format(self.cellsize)
+        MMM = []
+        for i in range(9):
+            if np.amax(self.materials[i,:,:])>0: MMM.append(i+1)
+        deets += "Materials used: {}\n".format(MMM)
+        deets += "Max & Min velocities\n"
+        deets += "Vx: {} m/s & {} m/s".format(np.amax(self.VX),np.amin(self.VX)) 
+        deets += "Vy: {} m/s & {} m/s".format(np.amax(self.VY),np.amin(self.VY))
+        return deets
 
 
     def matrixPorosity(self,matrix,bulk,void=False,Print=True):
