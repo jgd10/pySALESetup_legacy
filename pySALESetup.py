@@ -422,14 +422,16 @@ class Grain:
         deets += "equivalent radius: {:3.2f} cells\ncurrent coords: ({:2.2g}, {:2.2g})\n".format(self.equiv_rad,self.x,self.y)
         deets += "mixed cells: {}".format(self.mixed)
         return deets
-    def view(self):
+    def view(self,save=False,show=True,fname='grain.png'):
         """ view the grain in a simple plot """
-        fig = plt.figure()
+        fig = plt.figure(figsize=(3.,3.))
         ax = fig.add_subplot(111,aspect='equal')
         ax.imshow(self.mesh,cmap='binary')
         ax.set_xlabel('x [cells]')
         ax.set_ylabel('y [cells]')
-        plt.show()
+        fig.tight_layout()
+        if show: plt.show()
+        if save: fig.savefig(fname,dpi=200,transparency=True)
         ax.cla()
         
     def _cropGrain(self,x,y,LX,LY):
