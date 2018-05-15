@@ -106,7 +106,7 @@ for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
 
 meshA.fillAll(9)
 import copy
-meshB = copy.copy(meshA)
+meshB = copy.deepcopy(meshA)
 meshB.flipMesh()
 
 meshA.blanketVel(-1500.,axis=1)
@@ -115,6 +115,7 @@ meshB.blanketVel(+1500.,axis=1)
 meshC = pss.combine_meshes(meshA,meshB,axis=1)
 meshC.top_and_tail()
 meshC.viewMats()
+meshC.viewVels()
 meshC.save(fname='regolith_mirror_v3000.iSALE',compress=True)
 meshC.multiplyVels()
 meshC.save(fname='regolith_mirror_v1500.iSALE',compress=True)
