@@ -77,6 +77,7 @@ def polygon_area(X,Y):
         A: Scalar float
     """
     N = np.size(X)
+    assert N==np.size(Y), "ERROR: x and y index arrays are unequal in size"
     A = 0
     for i in range(1,N):
         A += (X[i-1]*Y[i]-X[i]*Y[i-1])*.5
@@ -201,7 +202,7 @@ def MeshfromBMP(imname,cellsize=2.e-6):
     
     return mesh
 
-def grainfromVertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,min_res=5):
+def grainfromVertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,radians=True,min_res=5):
     """
     This function generates a mesh0 from a text file containing a list of its vertices
     in normalised coordinates over a square grid of dimensions 1 x 1. Centre = (0,0)
@@ -225,20 +226,23 @@ def grainfromVertices(R=None,fname='shape.txt',mixed=False,eqv_rad=10.,rot=0.,mi
         mesh_:       square array with filled cells, with value 1
 
     """
+    if radians is not True: rot = rot*np.pi/180.
+    assert eqv_rad > 0, "ERROR: Equivalent radius must be greater than 0!"
     # If no coords provided use filepath
     
     if R is None:
         J_ = np.genfromtxt(fname,comments='#',usecols=0,delimiter=',')
         I_ = np.genfromtxt(fname,comments='#',usecols=1,delimiter=',')
     # else use provided coords
-    else:
-        if type(R) == list:
-            R = np.array(R)
+    elif type(R) == list:
+        R = np.array(R)
+    if type(R) == np.ndarray:
         J_ = R[:,0]
         I_ = R[:,1]
 
+
     # if coords not yet normalised; normalise them
-    if np.amax(I_)>1. or np.amax(J_)>1.:
+    if np.amax(abs(I_)>1.) or np.amax(abs(J_))>1.:
         MAXI  = np.amax(abs(I_))
         MAXJ  = np.amax(abs(J_))
         MAX   = max(MAXI,MAXJ)
@@ -308,6 +312,7 @@ def grainfromCircle(r_):
     Returns:
         mesh0: square array of floats
     """
+    assert r_>0, "ERROR: Radius must be greater than 0!"
     N = int(2.*ceil(r_)+2.)
     mesh0 = np.zeros((N,N))
     x0 = r_ + 1.                                                                                   
@@ -322,19 +327,22 @@ def grainfromCircle(r_):
                 mesh0[j,i] = 1.0                                                                        
     return mesh0
 
-def grainfromEllipse(r_,a_,e_):
+def grainfromEllipse(r_,a_,e_,radians=True):
     """
     This function generates an ellipse in mesh0. It uses a semi-major axis of r_
     a rotation of a_ and an eccentricity of e_. It otherwise works on
-    principles similar to those used in grainfromEllipse
+    principles similar to those used in grainfromCircle
     
     Args:
-        r_ : int; the semi major axis (in cells)
+        r_ : float; the semi major axis (in cells)
         a_ : float; the angle of rotation (in radians)
         e_ : float; the eccentricity of the ellipse
     Returns:
         mesh0: square array of floats
     """
+    if radians is not True: a_ = a_*np.pi/180.
+    assert e_ >= 0 and e_ < 1, "ERROR: eccentricity can not be less than 0 and must be less than 1; {} is not allowed".format(e_)
+    assert r_>0, "ERROR: Radius must be greater than 0!"
     N = int(2.*ceil(r_)+2.)
     mesh0 = np.zeros((N,N))
     x0 = r_ + 1                                                                                   
