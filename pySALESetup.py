@@ -1382,6 +1382,14 @@ class Mesh:
             self.VY[:,:num]  *= 0.
             self.VY[:,-num:] *= 0.
 
+    def deleteMat(self,m):
+        """
+        removes all cells of material m from the mesh
+        """
+        assert m>0, "ERROR: Material must be a number from 1-9"
+        self.materials[m-1,:,:] *= 0.
+        return
+
     def fillAll(self,m):
         """
         Fills entire mesh with material m. if m ==-1, it will fill it with void (essentially 
