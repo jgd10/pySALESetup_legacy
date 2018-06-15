@@ -124,7 +124,7 @@ def populateMesh(mesh,ensemble):
         g.place(x,y,m,mesh)
     return mesh
 
-def MeshfromPSSFILE(fname='meso_m.iSALE.gz',cellsize=2.e-6,NumMats=9):
+def MeshfromPSSFILE(fname='meso_m.iSALE.gz',cellsize=2.5e-6,NumMats=9):
     """
     Generate a Mesh instance from an existing meso output file. NB NumMats
     MUST be set explicitly because the function does not have the capbility 
@@ -1516,14 +1516,18 @@ class Mesh:
         if xbounds is None and ybounds is not None:
             # ensure all cells in box outside of ymin and ymax won't be considered
             condition = (self.yy>ybounds[0])*(self.yy<ybounds[1])
+            vf = float(np.sum(box[condition]))/np.size(box[condition])
         elif ybounds is None and xbounds is not None:
             # ensure all cells in box outside of xmin and xmax won't be considered
             condition = (self.xx>xbounds[0])*(self.xx<xbounds[1])
+            vf = float(np.sum(box[condition]))/np.size(box[condition])
         elif xbounds is not None and ybounds is not None:
             # Same proceedure if both given
             condition = (self.xx>xbounds[0])*(self.xx<xbounds[1])*(self.yy>ybounds[0])*(self.yy<ybounds[1])
-        
-        vf = float(np.sum(box[condition]))/np.size(box[condition])
+            print condition
+            vf = float(np.sum(box[condition]))/np.size(box[condition])
+        else:
+            vf = float(np.sum(box))/float(np.size(box))
         return vf
     
     def details(self):
