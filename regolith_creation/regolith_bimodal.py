@@ -38,5 +38,39 @@ except KeyboardInterrupt:
 groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]),populate=True)
 groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]),populate=True)
 
-meshA.viewMats()
-meshB.viewMats()
+meshA.fillAll(9)
+meshB.fillAll(9)
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
+# combine the pairs of meshes
+meshAB = pss.combine_meshes(meshA,meshB,axis=1)
+# top and tail each mesh (delete top and bottom 3 rows of cells)
+meshAB.top_and_tail()
+meshAB.viewMats()
+meshAB.save(fname='regolith_bimodalimplicit.iSALE',compress=True)
+meshA.deleteMat(9)
+meshB.deleteMat(9)
+
+try:
+    while vfracA < 0.5:
+        gSmall.insertRandomly(meshA,m=1)
+        groupA.add(gSmall,gSmall.x,gSmall.y)
+        vfracA = meshA.vfrac()
+    while vfracB < 0.5:
+        gSmall.insertRandomly(meshB,m=1)
+        groupB.add(gSmall,gSmall.x,gSmall.y)
+        vfracB = meshB.vfrac()
+except KeyboardInterrupt:
+    pass
+
+groupA.optimise_materials(np.array([1,2,3,4,5,6,7,8]),populate=True)
+groupB.optimise_materials(np.array([1,2,3,4,5,6,7,8]),populate=True)
+
+meshA.blanketVel(-1500.,axis=1)
+meshB.blanketVel(+1500.,axis=1)
+# combine the pairs of meshes
+meshAB = pss.combine_meshes(meshA,meshB,axis=1)
+# top and tail each mesh (delete top and bottom 3 rows of cells)
+meshAB.top_and_tail()
+meshAB.viewMats()
+meshAB.save(fname='regolith_bimodalexplicit.iSALE',compress=True)

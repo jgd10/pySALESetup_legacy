@@ -1275,7 +1275,7 @@ class Mesh:
 
     def viewVels(self,save=False,fname='vels.png'):
         """
-        View velocities in a simple plot and save file if wanted.
+        View velocities in a simple plot, and save the plot as a png if wanted.
         """
         self.checkVels()
         fig = plt.figure()
@@ -1502,6 +1502,7 @@ class Mesh:
     def calcVol(self,m=None,frac=False):
         """
         Calculate area of non-void in domain for material(s) m. 
+        Area is in cells NOT S.I.
         """
         if m is None:
             Vol = np.sum(self.materials)
@@ -1553,7 +1554,18 @@ class Mesh:
         deets += "Vx: {} m/s & {} m/s\n".format(np.amax(self.VX),np.amin(self.VX)) 
         deets += "Vy: {} m/s & {} m/s".format(np.amax(self.VY),np.amin(self.VY))
         return deets
-
+    
+    def VoidFracForTargetPorosity(self,matrix,bulk=0.5,final_por=0.65):
+        """
+        Calculates the void fraction required to reduce the matrix distension to specified porosity
+        (as an area fraction of the domain)
+        """
+        initial_por = self.matrixPorosity(matrix,bulk,void=False,Print=False)/100.
+        MatrixVol = self.calcVol(matrix)
+        VoidInMatrix = MatrixVol*initial_por
+        TargetVoidInMatrix = (final_por/initial_por)*VoidInMatrix
+        VoidVolumeFrac = (VoidInMatrix - TargetVoidInMatrix)/self.Ncells
+        return VoidVolumeFrac
 
     def matrixPorosity(self,matrix,bulk,void=False,Print=True):
         """

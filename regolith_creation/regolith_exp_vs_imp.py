@@ -65,7 +65,7 @@ grainsB = []
 # Minimum krubeim phi = min resolution (4 cppr)
 # Max ... '' '' '' '' = max resolution (200 cppr) 
 # Max res is one which still fits in the domain
-minres  = 20.
+minres  = 10
 maxphi  = -np.log2(2*minres*2.5e-3)
 minphi  = -np.log2(2*200*2.5e-3)
 
@@ -160,15 +160,28 @@ for xA,yA,gA,mA in zip(groupA.xc,groupA.yc,groupA.grains,groupA.mats):
 for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
     gB.place(xB,yB,mB,meshB)
 
-# Fill each domain with a matrix material; A+B will form a mesh, as will C+D
 meshA.fillAll(8)
 meshB.fillAll(8)
+v_voidA = meshA.VoidFracForTargetPorosity(8,bulk=0.5,final_por=0.65)
+v_voidB = meshB.VoidFracForTargetPorosity(8,bulk=0.5,final_por=0.65)
+GV = pss.Grain(eqr=4)
+vfA = 0.
+while vfA < v_void:
+    GV.insertRandomly(meshA, m=0,mattargets=[8])
+    vfA = 1.-meshB.calcVol(frac=True)
+    if vfA > v_void: break
+vfB = 0.
+while vfB < v_void:
+    GV.insertRandomly(meshB, m=0,mattargets=[8])
+    vfB = 1.-meshB.calcVol(frac=True)
+    if vfB > v_void: break
+# Fill each domain with a matrix material; A+B will form a mesh, as will C+D
 
 # Calculate porosity required for each matrix
-meshA.matrixPorosity(8,0.5,Print=True) 
-print groupA.details()
-meshB.matrixPorosity(8,0.5,Print=True) 
-print groupB.details()
+#meshA.matrixPorosity(8,0.5,Print=True) 
+#print groupA.details()
+#meshB.matrixPorosity(8,0.5,Print=True) 
+#print groupB.details()
 
 # Plot the particle size distribution created in each case
 #groupA.plotPSD()
@@ -191,7 +204,7 @@ meshAB.top_and_tail()
 meshAB.viewMats()
 
 # save final meshes as output files
-meshAB.save(fname='regolith_PSD_minres{}cppr.iSALE'.format(minres),compress=True)
+meshAB.save(fname='regolith_PSD_minres{}cppr+voids.iSALE'.format(minres),compress=True)
 
 # redo with new velocities if necessary.
 #meshC.multiplyVels()

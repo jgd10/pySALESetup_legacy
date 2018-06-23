@@ -79,23 +79,33 @@ mu = 3.5960554191
 sigma = 2.35633102167
 ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='grey',label='$\mu$, $\sigma$')
 ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='grey')
-sigma /= 2.
-ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='orange',label='$\mu$, $\sigma/2$')
-ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='orange')
-sigma *= 4.
-ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='darkred',label='$\mu$, $2\sigma$')
-ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='darkred')
-mu += 1.
-sigma = 2.35633102167
-ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='b',label='$\mu+1$, $\sigma$')
-ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='b')
+#sigma /= 2.
+#ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='orange',label='$\mu$, $\sigma/2$')
+#ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='orange')
+#sigma *= 4.
+#ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='darkred',label='$\mu$, $2\sigma$')
+#ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='darkred')
+#mu += 1.
+#sigma = 2.35633102167
+#ax1.plot(phi,normalPDF(phi,mu,sigma)*100.,color='b',label='$\mu+1$, $\sigma$')
+#ax2.plot(phi,normalCDF(phi,mu,sigma)*100.,color='b')
 for ax in [ax1,ax2]:
     ax.axvline(x=-0.3,color='k',linestyle='-.',label='Max grain size')
-    ax.axvline(x=5.6,color='k',linestyle=':',label = 'Min grain size')
+    p = -np.log2(8.*2.5e-3)
+    ax.axvline(x=p,color='.0',linestyle=':',label = '4cppr')
+    p = -np.log2(6.*2.5e-3)
+    ax.axvline(x=p,color='.2',linestyle=':',label = '3cppr')
+    p = -np.log2(4.*2.5e-3)
+    ax.axvline(x=p,color='.4',linestyle=':',label = '2cppr')
+    p = -np.log2(2.*2.5e-3)
+    ax.axvline(x=p,color='.6',linestyle=':',label = '1cppr')
+    p = -np.log2(1.*2.5e-3)
+    ax.axvline(x=p,color='orange',linestyle=':',label = '1/2cppr')
+
 ax1.legend(loc='best',fontsize='small')
 ax2.set_xlabel(r'$\phi = -log_2(D)$, D is in mm')
 ax1.set_ylabel(r'Area.\%')
 ax2.set_ylabel(r'Cumulative Area.\%')
-
-fig.savefig('fourPSDs.pdf')
+plt.show()
+#fig.savefig('fourPSDs.pdf')
 
