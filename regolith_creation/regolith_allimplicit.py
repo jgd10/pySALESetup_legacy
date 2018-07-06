@@ -16,8 +16,8 @@ vfrac = 0.5
 meshA.fillAll(1)
 meshB.fillAll(1)
 
-meshA.blanketVel(-1500.,axis=1)
-meshB.blanketVel(+1500.,axis=1)
+meshA.blanketVel(-375.,axis=1)
+meshB.blanketVel(+375.,axis=1)
 
 # combine the pairs of meshes
 meshAB = pss.combine_meshes(meshA,meshB,axis=1)

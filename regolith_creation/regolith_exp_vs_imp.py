@@ -162,19 +162,20 @@ for xB,yB,gB,mB in zip(groupB.xc,groupB.yc,groupB.grains,groupB.mats):
 
 meshA.fillAll(8)
 meshB.fillAll(8)
-v_voidA = meshA.VoidFracForTargetPorosity(8,bulk=0.5,final_por=0.65)
-v_voidB = meshB.VoidFracForTargetPorosity(8,bulk=0.5,final_por=0.65)
+v_voidA = meshA.VoidFracForTargetPorosity(8,bulk=0.5,final_por=0.5)
+v_voidB = meshB.VoidFracForTargetPorosity(8,bulk=0.5,final_por=0.5)
 GV = pss.Grain(eqr=4)
 vfA = 0.
-while vfA < v_void:
+print v_voidA*100.,v_voidB*100.
+while vfA < v_voidA:
     GV.insertRandomly(meshA, m=0,mattargets=[8])
-    vfA = 1.-meshB.calcVol(frac=True)
-    if vfA > v_void: break
+    vfA = 1.-meshA.calcVol(frac=True)
+    if vfA > v_voidA: break
 vfB = 0.
-while vfB < v_void:
+while vfB < v_voidB:
     GV.insertRandomly(meshB, m=0,mattargets=[8])
     vfB = 1.-meshB.calcVol(frac=True)
-    if vfB > v_void: break
+    if vfB > v_voidB: break
 # Fill each domain with a matrix material; A+B will form a mesh, as will C+D
 
 # Calculate porosity required for each matrix
@@ -204,7 +205,7 @@ meshAB.top_and_tail()
 meshAB.viewMats()
 
 # save final meshes as output files
-meshAB.save(fname='regolith_PSD_minres{}cppr+voids.iSALE'.format(minres),compress=True)
+meshAB.save(fname='regolith_PSD_minres{}cppr+voids_por0.50.iSALE'.format(minres),compress=True)
 
 # redo with new velocities if necessary.
 #meshC.multiplyVels()
