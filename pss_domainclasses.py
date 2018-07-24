@@ -561,3 +561,19 @@ class Mesh:
         elif axis == 1:
             bounds = [np.amin(self.xx),np.amax(self.xx)]
         return bounds
+
+class SetupInp:
+    """
+    Takes user-inputs to construct the necessary .inp files for iSALE
+
+    functionality to add:
+     - read and write all input files (asteroid, material, additional)
+     - edit properties within the files, dynamically; e.g. material yield strength
+     - view material properties/summary of them as wanted
+    
+    ~EXTRA~
+     - include iSALEMat algorithms?
+     - advise on EoS?
+    """
+    def __init__(self):
+        pass
