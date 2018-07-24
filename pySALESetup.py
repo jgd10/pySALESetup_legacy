@@ -1213,6 +1213,7 @@ class Mesh:
             Y:        int
             cellsize: float; equivalent to GRIDSPC in iSALE
             mixed:    bool
+            label:    str
         """
         self.x = X
         self.y = Y
