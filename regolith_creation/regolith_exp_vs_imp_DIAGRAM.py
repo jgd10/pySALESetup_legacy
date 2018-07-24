@@ -78,6 +78,10 @@ phiA = np.linspace(minphi,maxphi,NA)
 
 RsA = reverse_phi(phiA)/meshA.cellsize
 
+cmap = plt.cm.copper
+
+cols = [0.3,0.5,0.7]
+
 # interval over which to calculate number from pdf
 # No. = |CDF(x+h) - CDF(x-h)| * no. of areas
 hA = abs(phiA[1]-phiA[0])
@@ -130,10 +134,26 @@ ax3a = fig1.add_subplot(133,aspect='equal')
 ax1a.axis('off')
 ax2a.axis('off')
 ax3a.axis('off')
-ax1 = fig.add_subplot(141,aspect='equal')
-ax2 = fig.add_subplot(142,aspect='equal')
-ax3 = fig.add_subplot(143,aspect='equal')
-ax4 = fig.add_subplot(144,aspect='equal')
+ax11 = fig.add_subplot(241)
+ax22 = fig.add_subplot(242)
+ax33 = fig.add_subplot(243)
+ax44 = fig.add_subplot(244)
+sizes1 = [3,6,12,0]
+sizes2 = [0,3,6,12]
+colors1 = [0.7,.5,.3,.0]
+colors2 = [0.,.7,.5,.3]
+for ax,c1,sz1,c2,sz2 in zip([ax11,ax22,ax33,ax44],colors1,sizes1,colors2,sizes2):
+    ax.axis('off')
+    ax.text(0.4,0.3,'$DE_{min}$:  \n$DI_{max}$: ',va='center',ha='center',fontsize=18)
+    if ax != ax44: ax.plot([0.83],[0.42],marker='o',color=cmap(c1),ms=sz1)
+    if ax != ax11: ax.plot([0.83],[0.22],marker='o',color=cmap(c2),ms=sz2)
+    ax.set_xlim(0,1)
+    ax.set_ylim(0,1)
+
+ax1 = fig.add_subplot(245,aspect='equal')
+ax2 = fig.add_subplot(246,aspect='equal')
+ax3 = fig.add_subplot(247,aspect='equal')
+ax4 = fig.add_subplot(248,aspect='equal')
 group = []
 for ax in [ax1,ax2,ax3,ax4]:
     ctr = 0
@@ -151,32 +171,37 @@ for ax in [ax1,ax2,ax3,ax4]:
                 g.place(g.x,g.y,m,meshA)
                 ctr += 1
     if ax != ax1: meshA.fillAll(m+1)
-    for KK in range(meshA.NoMats):
-        matter = np.copy(meshA.materials[KK,:,:])*(KK+1)
+    for KK,col in zip(range(meshA.NoMats),cols):
+        matter = np.copy(meshA.materials[KK,:,:])*col
+        if KK!=2:
+            ax1a.contour(meshA.xi,meshA.yi,matter,1,colors='k',linewidths=1)
+            ax3a.contour(meshA.xi,meshA.yi,matter,1,colors='k',linewidths=1)
+        else:
+            pass
         matter = np.ma.masked_where(matter==0.,matter)
         if KK == 2 and ax==ax1:
-            ax1a.pcolormesh(meshA.xi,meshA.yi,matter, cmap='terrain',vmin=1,vmax=meshA.NoMats+1)
+            ax1a.pcolormesh(meshA.xi,meshA.yi,matter, cmap=cmap,vmin=0,vmax=1)
         if KK == 2 and ax==ax2:
-            ax3a.pcolormesh(meshA.xi,meshA.yi,matter, cmap='terrain',vmin=1,vmax=meshA.NoMats+1)
-        ax.pcolormesh(meshA.xi,meshA.yi,matter, cmap='terrain',vmin=1,vmax=meshA.NoMats+1)
+            ax3a.pcolormesh(meshA.xi,meshA.yi,matter, cmap=cmap,vmin=0,vmax=1)
+        ax.pcolormesh(meshA.xi,meshA.yi,matter, cmap=cmap,vmin=0,vmax=1)
     ax.axis('off')
     Rs = list(Rs[:-1])
     Fr = list(Fr[:-1])
     meshA.fillAll(-1)
-ax1.set_title('Fully Explicit')
-ax2.set_title('Semi-Explicit')
-ax3.set_title('Semi-Explicit')
-ax4.set_title('Fully Implicit')
+ax1.set_title('Explicitly\nResolved')
+ax2.set_title('Semi-Explicitly\nResolved')
+ax3.set_title('Semi-Explicitly\nResolved')
+ax4.set_title('Implicitly\nResolved')
 bbox_props = dict(boxstyle="darrow", fc='w', ec="k", lw=2)
-ax1.text(0.52, 0.2, "Explicit | Implicit", ha="center", va="center",
+ax1.text(0.52, 0.8, "Explicitly Resolved | Implicitly Resolved", ha="center", va="center",
                     size=15,bbox=bbox_props,transform=fig.transFigure)
 bbox_props = dict(boxstyle="rarrow", fc='w', ec="k", lw=2)
 ax2a.text(0.5, 0.5, "Parameterisation\nassumes\nuniform density", ha="center", va="center",
                     size=12,bbox=bbox_props)
 #fig.tight_layout()
-#fig.savefig('explicit_implicit_demonstration.png',dpi=300,transparent=True)
+fig.savefig('explicit_implicit_demonstration.png',dpi=300,transparent=True)
 fig1.savefig('matrixunifromity_assum_demonstration.png',dpi=300,transparent=True)
-#plt.show()
+plt.show()
 
 
 # view final meshes
