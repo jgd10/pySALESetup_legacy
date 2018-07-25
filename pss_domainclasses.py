@@ -575,5 +575,144 @@ class SetupInp:
      - include iSALEMat algorithms?
      - advise on EoS?
     """
-    def __init__(self):
-        pass
+    def __init__(self,mesh=None):
+        if mesh is not None:
+            self.MeshGeomParams = {'GRIDH':[0,mesh.X,0],'GRIDV':[0,mesh.Y,0],
+                                   'GRIDEXT':1.05,'GRIDSPC':mesh.cellsize,
+                                   'GRIDSPCM':-20.,
+                                   'CYL':False}
+            self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
+                                    'COL_SITE':self._colsite(mesh),
+                                    'ALE_MODE':'EULER','T_SURF':298.,
+                                    'GRAD_TYPE':'NONE'}
+            self.ProjParams = {'OBJNUM':1,
+                               'OBJRESH':math.ceil(mesh.X/2.),'OBJRESV':math.ceil(mesh.Y/2.),
+                               'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
+                               'OBJOFF_V':self._colsite(mesh)-mesh.Y-1}
+        else:
+            self.MeshGeomParams = {'GRIDH':[0,0,0],'GRIDV':[0,0,0],
+                                   'GRIDEXT':1.05,'GRIDSPC':0,
+                                   'GRIDSPCM':-20.,
+                                   'CYL':False}
+            self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
+                                    'COL_SITE':0,
+                                    'ALE_MODE':'EULER','T_SURF':298.,
+                                    'GRAD_TYPE':'NONE'}
+            self.ProjParams = {'OBJNUM':1,
+                               'OBJRESH':0,'OBJRESV':0,
+                               'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
+                               'OBJOFF_V':0}
+            self.read_astinp()
+
+    def read_astinp():
+        """
+        reads asteroid.inp and extracts relevant values for editing/viewing
+        Additionally assumes correct data types for each value.
+        """
+        with open('./asteroid.inp','r') as ast:
+            StartSearch = False
+            StopSearch = True
+            for counter,line in enumerate(ast):
+                if line[0] == '-': 
+                    pass
+                else:
+                    tag = line[:11].strip()
+                    if tag=='GRIDH': 
+                        StartSearch = True
+                        StopSearch = False
+                    if StartSearch is True and StopSearch is not True:
+                        if self.MeshGeomParams.has_key(tag):
+                            self.MeshGeomParams[tag] = self._getval(line)
+                        if self.GlobSetupParams.has_key(tag):
+                            self.GlobSetupParams[tag] = self._getval(line)
+                        if self.ProjParams.has_key(tag):
+                            self.ProjParams[tag] = self._getval(line)
+                    if tag == 'DT': 
+                        StopSearch = True
+    
+    def write_astinp():
+        with open('./asteroid.inp','rw') as ast:
+            StartSearch = False
+            StopSearch = True
+            for counter,line in enumerate(ast):
+                if line[0] == '-': 
+                    pass
+                else:
+                    tag = line[:11].strip()
+                    if tag=='GRIDH': 
+                        StartSearch = True
+                        StopSearch = False
+                    """
+                    This bit needs to do the above but in reverse...
+                    """
+                    #if StartSearch is True and StopSearch is not True:
+                    #    if self.MeshGeomParams.has_key(tag):
+                    #        self.MeshGeomParams[tag] = self._getval(line)
+                    #    if self.GlobSetupParams.has_key(tag):
+                    #        self.GlobSetupParams[tag] = self._getval(line)
+                    #    if self.ProjParams.has_key(tag):
+                    #        self.ProjParams[tag] = self._getval(line)
+                    #if tag == 'DT': 
+                    #    StopSearch = True
+
+    def _getval(self,line):
+        """
+        takes lines like the following: 
+
+        S_TYPE      setup type                    : MESO_PART 
+        OBJRESH     CPPR horizontal               : 100         : 100         : 40
+        OBJVEL      object velocity               : -5.0D2      : 0.D0        : 0.D
+
+        and extracts the values between the ':', additionally assigning them the correct type as it goes
+        """
+        val = []
+        index = 0
+        while index >= 0:
+            oldindex = index
+            index = line.find(':',index) + 1
+            if index == 0:
+                pass
+            elif index < 0:
+                data = _findtype(line[oldindex:].strip())
+                val.append(data)
+            else:
+                data = _findtype(line[oldindex:index].strip())
+                val.append(data)
+        return val
+
+    def _findtype(self,string):
+        """ converts values to correct type (float or string; no ints for now) """
+        try: 
+            float(string[0])
+            number = True
+        except ValueError:
+            number = False
+        # if float convert Fortran real*8 (D) to python exponential
+        if number:
+            newstring = string.replace('D','e')
+            if newstring[-1] == 'e': newstring += '0'
+            value = float(newstring)
+        else:
+            value = string
+        return value
+
+    def _colsite(self,mesh):
+        """
+        Calculates location of collision site within the simulation from the velocities
+        """
+        uniqueVY = np.unique(mesh.VY)
+        # if only one velocity in mesh => all moving in one direction OR stationary
+        assert np.size(uniqueVY) <= 2., "ERROR; more than one collision location present"
+        # if stationary
+        if np.size(uniqueVY) == 0.:
+            # if material travelling down: Cstie at base of mesh
+            if uniqueVY < 0.: Csite = 1
+            # if up: at top of mesh
+            if uniqueVY >= 0.: Csite = mesh.Y+1
+        else:
+            # if two vels then collision at material boundary between two of vels
+            minVY = np.amax(uniqueVY)
+            Csite = np.argmax(mesh.VY==maxVY)+1
+        return Csite
+    
+
