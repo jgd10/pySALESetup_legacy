@@ -575,85 +575,102 @@ class SetupInp:
      - include iSALEMat algorithms?
      - advise on EoS?
     """
-    def __init__(self,mesh=None):
-        if mesh is not None:
-            self.MeshGeomParams = {'GRIDH':[0,mesh.X,0],'GRIDV':[0,mesh.Y,0],
-                                   'GRIDEXT':1.05,'GRIDSPC':mesh.cellsize,
-                                   'GRIDSPCM':-20.,
-                                   'CYL':False}
-            self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
-                                    'COL_SITE':self._colsite(mesh),
-                                    'ALE_MODE':'EULER','T_SURF':298.,
-                                    'GRAD_TYPE':'NONE'}
-            self.ProjParams = {'OBJNUM':1,
-                               'OBJRESH':math.ceil(mesh.X/2.),'OBJRESV':math.ceil(mesh.Y/2.),
-                               'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
-                               'OBJOFF_V':self._colsite(mesh)-mesh.Y-1}
-        else:
-            self.MeshGeomParams = {'GRIDH':[0,0,0],'GRIDV':[0,0,0],
-                                   'GRIDEXT':1.05,'GRIDSPC':0,
-                                   'GRIDSPCM':-20.,
-                                   'CYL':False}
-            self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
-                                    'COL_SITE':0,
-                                    'ALE_MODE':'EULER','T_SURF':298.,
-                                    'GRAD_TYPE':'NONE'}
-            self.ProjParams = {'OBJNUM':1,
-                               'OBJRESH':0,'OBJRESV':0,
-                               'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
-                               'OBJOFF_V':0}
-            self.read_astinp()
+    def __init__(self):
+        self.MeshGeomParams = {'GRIDH':[0,0,0],'GRIDV':[0,0,0],
+                               'GRIDEXT':1.05,'GRIDSPC':0,
+                               'GRIDSPCM':-20.,
+                               'CYL':False}
+        self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
+                                'COL_SITE':0,
+                                'ALE_MODE':'EULER','T_SURF':298.,
+                                'GRAD_TYPE':'NONE'}
+        self.ProjParams = {'OBJNUM':1,
+                           'OBJRESH':0,'OBJRESV':0,
+                           'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
+                           'OBJOFF_V':0}
 
-    def read_astinp():
+    def populate_fromMesh(self,MM):
+        """ popuate the dictionary from an existing Mesh instance """
+
+        self.MeshGeomParams = {'GRIDH':[0,MM.x,0],'GRIDV':[0,MM.y,0],
+                               'GRIDEXT':1.05,'GRIDSPC':MM.cellsize,
+                               'GRIDSPCM':-20.,
+                               'CYL':False}
+        self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
+                                'COL_SITE':self._colsite(MM),
+                                'ALE_MODE':'EULER','T_SURF':298.,
+                                'GRAD_TYPE':'NONE'}
+        self.ProjParams = {'OBJNUM':1,
+                           'OBJRESH':math.ceil(MM.x/2.),'OBJRESV':math.ceil(MM.y/2.),
+                           'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
+                           'OBJOFF_V':self._colsite(MM)-MM.Y-1} 
+
+    def read_astinp(self, filepath='./asteroid.inp'):
         """
         reads asteroid.inp and extracts relevant values for editing/viewing
         Additionally assumes correct data types for each value.
         """
-        with open('./asteroid.inp','r') as ast:
+        with open(filepath,'r') as ast:
+            for K in self.ProjParams.keys():
+                ast.seek(0)
+                if (K in ast.read()) == False: self.ProjParams[K] = []
+            for K in self.GlobSetupParams.keys():
+                ast.seek(0)
+                if (K in ast.read()) == False: self.GlobSetupParams[K] = []
+            for K in self.MeshGeomParams.keys():
+                ast.seek(0)
+                if (K in ast.read()) == False: self.MeshGeomParams[K] = []
             StartSearch = False
             StopSearch = True
-            for counter,line in enumerate(ast):
+            ast.seek(0)
+            NewFile = ''
+            for line in ast:
+                NewFile += line
                 if line[0] == '-': 
                     pass
                 else:
                     tag = line[:11].strip()
+
                     if tag=='GRIDH': 
                         StartSearch = True
                         StopSearch = False
                     if StartSearch is True and StopSearch is not True:
                         if self.MeshGeomParams.has_key(tag):
                             self.MeshGeomParams[tag] = self._getval(line)
-                        if self.GlobSetupParams.has_key(tag):
+                        elif self.GlobSetupParams.has_key(tag):
                             self.GlobSetupParams[tag] = self._getval(line)
-                        if self.ProjParams.has_key(tag):
+                        elif self.ProjParams.has_key(tag):
                             self.ProjParams[tag] = self._getval(line)
                     if tag == 'DT': 
                         StopSearch = True
     
-    def write_astinp():
-        with open('./asteroid.inp','rw') as ast:
+    def write_astinp(self, filepath='./asteroid.inp'):
+        """
+        Write dictionary contents into the correct locations in the input file
+        """
+        with open(filepath,'rw') as ast:
             StartSearch = False
             StopSearch = True
-            for counter,line in enumerate(ast):
+            NewFile = ''
+            for line in ast:
+                NewFile += line
                 if line[0] == '-': 
                     pass
                 else:
                     tag = line[:11].strip()
+
                     if tag=='GRIDH': 
                         StartSearch = True
                         StopSearch = False
-                    """
-                    This bit needs to do the above but in reverse...
-                    """
-                    #if StartSearch is True and StopSearch is not True:
-                    #    if self.MeshGeomParams.has_key(tag):
-                    #        self.MeshGeomParams[tag] = self._getval(line)
-                    #    if self.GlobSetupParams.has_key(tag):
-                    #        self.GlobSetupParams[tag] = self._getval(line)
-                    #    if self.ProjParams.has_key(tag):
-                    #        self.ProjParams[tag] = self._getval(line)
-                    #if tag == 'DT': 
-                    #    StopSearch = True
+                    if StartSearch is True and StopSearch is not True:
+                        if self.MeshGeomParams.has_key(tag):
+                            self.MeshGeomParams[tag] = self._getval(line)
+                        elif self.GlobSetupParams.has_key(tag):
+                            self.GlobSetupParams[tag] = self._getval(line)
+                        elif self.ProjParams.has_key(tag):
+                            self.ProjParams[tag] = self._getval(line)
+                    if tag == 'DT': 
+                        StopSearch = True
 
     def _getval(self,line):
         """
@@ -666,24 +683,32 @@ class SetupInp:
         and extracts the values between the ':', additionally assigning them the correct type as it goes
         """
         val = []
+        # first char ALWAYS part of the tag
         index = 0
-        while index >= 0:
+        # when end of line reached, index loops back round to 0
+        first = True
+        lineEnd = False
+        while lineEnd is False:
             oldindex = index
             index = line.find(':',index) + 1
-            if index == 0:
-                pass
+            if first:
+                first = False
             elif index < 0:
-                data = _findtype(line[oldindex:].strip())
+                data = self._findtype(line[oldindex:].strip())
                 val.append(data)
+                char += charnum
             else:
-                data = _findtype(line[oldindex:index].strip())
+                data = self._findtype(line[oldindex:index-1].strip())
                 val.append(data)
+            if index == 0: lineEnd = True
         return val
 
     def _findtype(self,string):
         """ converts values to correct type (float or string; no ints for now) """
         try: 
-            float(string[0])
+            s = string[0]
+            if string[0] == '-': s = string[1]
+            float(s)
             number = True
         except ValueError:
             number = False
