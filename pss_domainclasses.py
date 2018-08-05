@@ -577,33 +577,39 @@ class SetupInp:
     """
     def __init__(self):
         self.MeshGeomParams = {'GRIDH':[0,0,0],'GRIDV':[0,0,0],
-                               'GRIDEXT':1.05,'GRIDSPC':0,
-                               'GRIDSPCM':-20.,
-                               'CYL':False}
-        self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
-                                'COL_SITE':0,
-                                'ALE_MODE':'EULER','T_SURF':298.,
-                                'GRAD_TYPE':'NONE'}
-        self.ProjParams = {'OBJNUM':1,
-                           'OBJRESH':0,'OBJRESV':0,
-                           'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
-                           'OBJOFF_V':0}
+                               'GRIDEXT':[1.05],'GRIDSPC':[0],
+                               'GRIDSPCM':[-20],
+                               'CYL':[0.]}
+        self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
+                                'COL_SITE':[0],
+                                'ALE_MODE':['EULER'],'T_SURF':[298.],
+                                'GRAD_TYPE':['NONE']}
+        self.ProjParams = {'OBJNUM':[1],
+                           'OBJRESH':[0],'OBJRESV':[0],
+                           'OBJMAT':['VOID___'],'OBJTYPE':['PLATE'],'OBJTPROF':['CONST'],
+                           'OBJOFF_V':[0]}
+        self.AdditionalParams = {'PARNUM':[1],
+                                 'PARMAT':['matter1'],
+                                 'PARHOBJ':[1]}
 
     def populate_fromMesh(self,MM):
         """ popuate the dictionary from an existing Mesh instance """
 
         self.MeshGeomParams = {'GRIDH':[0,MM.x,0],'GRIDV':[0,MM.y,0],
-                               'GRIDEXT':1.05,'GRIDSPC':MM.cellsize,
-                               'GRIDSPCM':-20.,
-                               'CYL':False}
-        self.GlobSetupParams = {'S_TYPE':'IMPRT_GEOM',
-                                'COL_SITE':self._colsite(MM),
-                                'ALE_MODE':'EULER','T_SURF':298.,
-                                'GRAD_TYPE':'NONE'}
-        self.ProjParams = {'OBJNUM':1,
-                           'OBJRESH':math.ceil(MM.x/2.),'OBJRESV':math.ceil(MM.y/2.),
-                           'OBJMAT':'VOID___','OBJTYPE':'PLATE','OBJTPROF':'CONST',
-                           'OBJOFF_V':self._colsite(MM)-MM.Y-1} 
+                               'GRIDEXT':[1.05],'GRIDSPC':[MM.cellsize],
+                               'GRIDSPCM':[-20],
+                               'CYL':[0.]}
+        self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
+                                'COL_SITE':[self._colsite(MM)],
+                                'ALE_MODE':['EULER'],'T_SURF':[298.],
+                                'GRAD_TYPE':['NONE']}
+        self.ProjParams = {'OBJNUM':[1],
+                           'OBJRESH':[math.ceil(MM.x/2.)],'OBJRESV':[math.ceil(MM.y/2.)],
+                           'OBJMAT':['VOID___'],'OBJTYPE':['PLATE'],'OBJTPROF':['CONST'],
+                           'OBJOFF_V':[self._colsite(MM)-MM.Y-1]} 
+        self.AdditionalParams = {'PARNUM':[MM.NoMats],
+                                 'PARMAT':['matter{:i}'.format(x+1) for x in range(MM.NoMats)],
+                                 'PARHOBJ':[x+1 for x in range(MM.NoMats)]}
 
     def read_astinp(self, filepath='./asteroid.inp'):
         """
@@ -644,33 +650,95 @@ class SetupInp:
                     if tag == 'DT': 
                         StopSearch = True
     
-    def write_astinp(self, filepath='./asteroid.inp'):
+    def read_addinp(self, filepath='./additional.inp'):
         """
-        Write dictionary contents into the correct locations in the input file
+        reads additional.inp and extracts relevant values for editing/viewing
+        Additionally assumes correct data types for each value.
         """
-        with open(filepath,'rw') as ast:
-            StartSearch = False
-            StopSearch = True
-            NewFile = ''
-            for line in ast:
-                NewFile += line
+        with open(filepath,'r') as add:
+            for K in self.AdditionalParams.keys():
+                add.seek(0)
+                if (K in add.read()) == False: self.AdditionalParams[K] = []
+            add.seek(0)
+            for line in add:
                 if line[0] == '-': 
                     pass
                 else:
                     tag = line[:11].strip()
 
-                    if tag=='GRIDH': 
-                        StartSearch = True
-                        StopSearch = False
-                    if StartSearch is True and StopSearch is not True:
-                        if self.MeshGeomParams.has_key(tag):
-                            self.MeshGeomParams[tag] = self._getval(line)
-                        elif self.GlobSetupParams.has_key(tag):
-                            self.GlobSetupParams[tag] = self._getval(line)
-                        elif self.ProjParams.has_key(tag):
-                            self.ProjParams[tag] = self._getval(line)
+                    if self.AdditionalParams.has_key(tag): self.AdditionalParams[tag] = self._getval(line)
+    
+    def write_addinp(self, filepath='./additional.inp'):
+        """
+        Write dictionary contents into the correct locations in the additional input file
+        """
+        with open(filepath,'rb') as add:
+            NewFile = ''
+            for line in add:
+                if line[0] == '-': 
+                    pass
+                else:
+                    tag = line[:11].strip()
+                    if self.AdditionalParams.has_key(tag):
+                        line = self._writevals(line,self.AdditionalParams[tag])
+                NewFile += line
+        with open(filepath,'wb') as add2:
+            add2.write(NewFile)
+        return
+
+    def write_astinp(self, filepath='./asteroid.inp'):
+        """
+        Write dictionary contents into the correct locations in the input file
+        """
+        StopSearch = False
+        with open(filepath,'rb') as ast:
+            NewFile = ''
+            for line in ast:
+                if line[0] == '-': 
+                    pass
+                elif StopSearch is not True:
+                    tag = line[:11].strip()
+                    if self.MeshGeomParams.has_key(tag):
+                        line = self._writevals(line,self.MeshGeomParams[tag])
+                    elif self.GlobSetupParams.has_key(tag):
+                        line = self._writevals(line,self.GlobSetupParams[tag])
+                    elif self.ProjParams.has_key(tag):
+                        line = self._writevals(line,self.ProjParams[tag])
                     if tag == 'DT': 
                         StopSearch = True
+                NewFile += line
+        with open(filepath,'wb') as ast2:
+            ast2.write(NewFile)
+        return
+
+    def _writevals(self,line,vals):
+        """
+        construct a new string to be saved as a new file containing any altered input values
+        """
+        def float_to_double(flt):
+            new = '{:.3e}'.format(flt)
+            new2 = new.replace('e','D')
+            return new2
+
+        index = line.find(':')
+        altline = line[:index]
+        
+        if type(vals) != list: vals = list(vals)
+
+        for v in vals:
+            insertval = ': '
+            if type(v) == str:
+                insertval += v
+            elif type(v) == int:
+                insertval += '{}'.format(v)
+            elif type(v) == float:
+                insertval += float_to_double(v)
+            altline += insertval
+            altline += ' '
+        altline += '\n'
+
+        return altline
+        
 
     def _getval(self,line):
         """
@@ -714,9 +782,12 @@ class SetupInp:
             number = False
         # if float convert Fortran real*8 (D) to python exponential
         if number:
-            newstring = string.replace('D','e')
-            if newstring[-1] == 'e': newstring += '0'
-            value = float(newstring)
+            if 'D' not in string and 'd' not in string and '.' not in string:
+                value = int(string)
+            else:
+                newstring = string.replace('D','e')
+                if newstring[-1] == 'e': newstring += '0'
+                value = float(newstring)
         else:
             value = string
         return value
