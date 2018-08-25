@@ -611,6 +611,39 @@ class SetupInp:
                                  'PARMAT':['matter{:i}'.format(x+1) for x in range(MM.NoMats)],
                                  'PARHOBJ':[x+1 for x in range(MM.NoMats)]}
 
+    def calc_extzone(self,Length,Direction='East',TotalLength=0.):
+        """
+        Calculates the extension zone size (and updates the internal value) as well as the necessary OBJRES 
+        of the object it is intended for, if wanted.
+        Currently, however, the OBJRES of the object is returned explicitly (not updated internally).
+        """
+        GRIDSPC = self.MeshGeomParams['GRIDSPC']
+        GRIDSPCM = -self.MeshGeomParams['GRIDSPCM']
+        GRIDEXT = self.MeshGeomParams['GRIDEXT']
+        assert GRIDSPCM > 0, "ERROR: pySALESetup can not cope with GRDISPCM > 0 yet"
+        l=0                                      # Physical size of extension zone during calculation
+        n=0                                      # No. cells in extension zone calculator
+        while (l<=Length):                       # calculate actual length (metres)
+            if (GRIDEXT**n>GRIDSPCM):            # cap cell size at 20 times original
+                l+=GRIDSPCM*GRIDSPC              # add on capped size
+            else:
+                l+=GRIDSPC*(GRIDEXT**(n+1))      # increment by new cell size
+            n+=1
+        OBJRES = 0
+        if Direction == 'East':
+            self.MeshGeomParams['GRIDH'][2] = n
+        elif Direction == 'West':
+            self.MeshGeomParams['GRIDH'][0] = n
+        elif Direction == 'North':
+            self.MeshGeomParams['GRIDV'][2] = n
+        elif Direction == 'South':
+            self.MeshGeomParams['GRIDV'][0] = n
+        if TotalLength > 0.:
+            # calculate the OBJRES of the object containing an extension zone
+            ObjLength = float(raw_input("Input the total Length of the object in question (m): "))
+            OBJRES = math.ceil(.5*TotalLength/GRIDSPC)
+        return OBJRES
+
     def read_astinp(self, filepath='./asteroid.inp'):
         """
         reads asteroid.inp and extracts relevant values for editing/viewing
