@@ -2,7 +2,7 @@ import random
 import warnings
 import numpy as np
 from PIL import Image
-from math import ceil
+import math
 import cPickle as pickle
 import scipy.special as scsp
 from scipy import stats as scst
@@ -230,15 +230,15 @@ class Mesh:
             # Fill chosen material mesh with the appropriate quantities
             self.materials[m-1] = mat_tofill 
     
-    def fillPlate(self,m,MMin,MMax,axis=0):
+    def fillPlate(self,m,MMin,MMax,axis=1):
         """
-        Fills all rows (or columns if axis = 1) of mesh with material m between MMin and MMax. 
+        Fills all columns (or rows if axis = 1) of mesh with material m between MMin and MMax. 
         if m ==-1, it will fill it with void (essentially deleting existing matter). Otherwise 
         existing material is prioritised.
         """
-        if axis == 0:
+        if axis == 1:
             condition = (self.yy<=MMax)*(self.yy>=MMin)
-        elif axis == 1:
+        elif axis == 0:
             condition = (self.xx<=MMax)*(self.xx>=MMin)
         if m == -1:
             # Erase all materials
@@ -416,7 +416,18 @@ class Mesh:
             print "bulk porosity = {:3.3f}%".format(bulk*100.)
             print "Matrix: porosity = {:3.3f}% and distension = {:3.3f}".format(matrix_por*100.,distension)
         return matrix_por*100.
-
+    
+    def calcNoMats(self):
+        # make list of used material numbers
+        # iterate through them all
+        usedmats = self.mats[:]
+        for mm in self.mats:
+            # If a material hasn't been used...
+            total = np.sum(self.materials[mm-1])
+            # ...remove from usedmats list
+            if total == 0.: usedmats.remove(mm)
+        NM = len(usedmats)
+        return NM
 
     def save(self,fname='meso_m.iSALE',info=False,compress=False):
         """
@@ -452,15 +463,9 @@ class Mesh:
         UY    = np.zeros((ncells))
         K     = 0
         
-        # make list of used material numbers
-        # iterate through them all
+        NM = self.calcNoMats()
         usedmats = self.mats[:]
-        for mm in self.mats:
-            # If a material hasn't been used...
-            total = np.sum(self.materials[mm-1])
-            # ...remove from usedmats list
-            if total == 0.: usedmats.remove(mm)
-        NM = len(usedmats)
+        
         FRAC = np.zeros((NM,ncells))
         for j in range(self.x):
             for i in range(self.y):
@@ -583,11 +588,11 @@ class SetupInp:
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
                                 'COL_SITE':[0],
                                 'ALE_MODE':['EULER'],'T_SURF':[298.],
-                                'GRAD_TYPE':['NONE']}
+                                'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
         self.ProjParams = {'OBJNUM':[1],
                            'OBJRESH':[0],'OBJRESV':[0],
                            'OBJMAT':['VOID___'],'OBJTYPE':['PLATE'],'OBJTPROF':['CONST'],
-                           'OBJOFF_V':[0]}
+                           'OBJOFF_V':[0],'OBJVEL':[0.]}
         self.AdditionalParams = {'PARNUM':[1],
                                  'PARMAT':['matter1'],
                                  'PARHOBJ':[1]}
@@ -602,14 +607,14 @@ class SetupInp:
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
                                 'COL_SITE':[self._colsite(MM)],
                                 'ALE_MODE':['EULER'],'T_SURF':[298.],
-                                'GRAD_TYPE':['NONE']}
+                                'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
         self.ProjParams = {'OBJNUM':[1],
-                           'OBJRESH':[math.ceil(MM.x/2.)],'OBJRESV':[math.ceil(MM.y/2.)],
+                           'OBJRESH':[int(math.ceil(MM.x/2.))],'OBJRESV':[int(math.ceil(MM.y/2.))],
                            'OBJMAT':['VOID___'],'OBJTYPE':['PLATE'],'OBJTPROF':['CONST'],
-                           'OBJOFF_V':[self._colsite(MM)-MM.Y-1]} 
-        self.AdditionalParams = {'PARNUM':[MM.NoMats],
-                                 'PARMAT':['matter{:i}'.format(x+1) for x in range(MM.NoMats)],
-                                 'PARHOBJ':[x+1 for x in range(MM.NoMats)]}
+                           'OBJOFF_V':[int(self._colsite(MM)-MM.y-1)],'OBJVEL':[0.]} 
+        self.AdditionalParams = {'PARNUM':[MM.calcNoMats()],
+                                 'PARMAT':['matter{:1.0f}'.format(x+1) for x in range(MM.calcNoMats())],
+                                 'PARHOBJ':[1 for x in range(MM.calcNoMats())]}
 
     def calc_extzone(self,Length,Direction='East',TotalLength=0.):
         """
@@ -705,6 +710,7 @@ class SetupInp:
         """
         Write dictionary contents into the correct locations in the additional input file
         """
+        uneededparams = ['PARRESH','PARTYPE','PARFRAC','PARDIST','PARRANGE']
         with open(filepath,'rb') as add:
             NewFile = ''
             for line in add:
@@ -714,7 +720,10 @@ class SetupInp:
                     tag = line[:11].strip()
                     if self.AdditionalParams.has_key(tag):
                         line = self._writevals(line,self.AdditionalParams[tag])
-                NewFile += line
+                if line[:11].strip() in uneededparams:
+                    pass
+                else:
+                    NewFile += line
         with open(filepath,'wb') as add2:
             add2.write(NewFile)
         return
@@ -727,6 +736,7 @@ class SetupInp:
         with open(filepath,'rb') as ast:
             NewFile = ''
             for line in ast:
+                # skip any layers because pss supercedes them
                 if line[0] == '-': 
                     pass
                 elif StopSearch is not True:
@@ -739,7 +749,11 @@ class SetupInp:
                         line = self._writevals(line,self.ProjParams[tag])
                     if tag == 'DT': 
                         StopSearch = True
-                NewFile += line
+                # remove all layer lines from input file
+                if line[:3] == 'LAY' and tag != 'LAYNUM':
+                    pass
+                else:
+                    NewFile += line
         with open(filepath,'wb') as ast2:
             ast2.write(NewFile)
         return
@@ -749,21 +763,21 @@ class SetupInp:
         construct a new string to be saved as a new file containing any altered input values
         """
         def float_to_double(flt):
-            new = '{:.3e}'.format(flt)
+            new = '{:.5e}'.format(flt)
             new2 = new.replace('e','D')
             return new2
 
         index = line.find(':')
         altline = line[:index]
         
-        if type(vals) != list: vals = list(vals)
+        if type(vals) != list: vals = [vals]
 
         for v in vals:
             insertval = ': '
             if type(v) == str:
                 insertval += v
             elif type(v) == int:
-                insertval += '{}'.format(v)
+                insertval += '{:1.0f}'.format(v)
             elif type(v) == float:
                 insertval += float_to_double(v)
             altline += insertval
@@ -840,7 +854,7 @@ class SetupInp:
             if uniqueVY >= 0.: Csite = mesh.Y+1
         else:
             # if two vels then collision at material boundary between two of vels
-            minVY = np.amax(uniqueVY)
+            maxVY = np.amax(uniqueVY)
             Csite = np.argmax(mesh.VY==maxVY)+1
         return Csite
     
