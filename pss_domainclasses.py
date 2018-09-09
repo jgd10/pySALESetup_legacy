@@ -933,6 +933,7 @@ class SetupInp:
                                'CYL':[0.]}
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
                                 'COL_SITE':[0],
+                                'ORIGIN':[0],
                                 'ALE_MODE':['EULER'],'T_SURF':[298.],
                                 'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
         self.ProjParams = {'OBJNUM':[1],
@@ -958,6 +959,7 @@ class SetupInp:
                                'CYL':[0.]}
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
                                 'COL_SITE':[int(self._colsite(MM))],
+                                'ORIGIN':[int(self._colsite(MM))],
                                 'ALE_MODE':['EULER'],'T_SURF':[298.],
                                 'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
         self.ProjParams = {'OBJNUM':[1],
@@ -1001,6 +1003,7 @@ class SetupInp:
                                 self.GlobSetupParams['COL_SITE'][0] -= abs(newPs[k][0] - oldPs[k][0])
                             else:
                                 pass
+                            self.GlobSetupParams['ORIGIN'][0] = self.GlobSetupParams['COL_SITE'][0]
                     # check if number of materials in additional params is correct
                     if k in ['PARNUM','PARMAT','PARHOBJ'] and firstADDPRMS:
                         firstADDPRMS = True
@@ -1019,6 +1022,7 @@ class SetupInp:
                 self.AllParamsOld = deepcopy(self.AllParams)
             else:
                 warnings.warn('There were some errors in the last parameter set; fix these before continuing')
+            
         return
                                     
     def calc_extzone(self,Length,Direction='East',TotalLength=0.):
