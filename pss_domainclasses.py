@@ -934,17 +934,72 @@ class SetupInp:
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
                                 'COL_SITE':[0],
                                 'ORIGIN':[0],
-                                'ALE_MODE':['EULER'],'T_SURF':[298.],
-                                'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
+                                'VEL_CUT':[0],
+                                'T_SURF':[298.],
+                                'GRAD_TYPE':['NONE'],
+                                'LAYNUM':[0]}
+        #'ALE_MODE':['EULER'],
         self.ProjParams = {'OBJNUM':[1],
                            'OBJRESH':[0],'OBJRESV':[0],
-                           'OBJMAT':['VOID___'],'OBJTYPE':['PLATE'],'OBJTPROF':['CONST'],
-                           'OBJOFF_V':[0],'OBJVEL':[0.]}
+                           'OBJMAT':['VOID___'],
+                           'OBJTYPE':['PLATE'],
+                           'OBJTPROF':['CONST'],
+                           'OBJOFF_V':[0],
+                           'OBJVEL':[0.]}
         self.AdditionalParams = {'PARNUM':[1],
                                  'PARMAT':['matter1'],
                                  'PARHOBJ':[1]}
         self.AllParams = [self.MeshGeomParams,self.GlobSetupParams,self.ProjParams,self.AdditionalParams]
         self.AllParamsOld = deepcopy(self.AllParams) 
+        
+        # default text for each line in asteroid.inp and additional.inp
+        # all fields are to be added to the Param dicts, eventually.
+        self.inputText = {'VERSION':'VERSION             __DO NOT MODIFY__             : 4.1',
+                          'DIMENSION':'DIMENSION           dimension of input file       : 2',
+                          'PATH':'PATH                Data file path                : ./',
+                          'MODEL':'MODEL               Modelname                     : dummy',
+                          'GRIDH':'GRIDH               horizontal cells              : 0 : 100 : 0 ',
+                          'GRIDV':'GRIDV               vertical cells                : 0 : 100 : 0 ',
+                          'GRIDEXT':'GRIDEXT             ext. factor                   : 1.05000D+00 ',
+                          'GRIDSPC':'GRIDSPC             grid spacing                  : 2.5D-06 ',
+                          'CYL':'CYL                 Cylind. geometry              : 1 ',
+                          'GRIDSPCM':'GRIDSPCM            max. grid spacing             : -20 ',
+                          'S_TYPE':'S_TYPE              setup type                    : IMPRT_GEOM ',
+                          'GRAD_TYPE':'GRAD_TYPE           gradient type                 : NONE ',
+                          'COL_SITE':'COL_SITE            Collision j-location          : 201 ',
+                          'ORIGIN':'ORIGIN              Origin j-location             : 201 ',
+                          'VEL_CUT':'VEL_CUT             Max (abs) velocity allowed    : 1.00000D+04 ',
+                          'T_SURF':'T_SURF              Surface temp                  : 2.93000D+02 ',
+                          'OBJNUM':'OBJNUM              number of objects             : 1 ',
+                          'OBJRESH':'OBJRESH             CPPR horizontal               : 100', 
+                          'OBJRESV':'OBJRESV             CPPR vertical                 : 100',
+                          'OBJVEL':'OBJVEL              object velocity               : 0.00000D+00 ',
+                          'OBJMAT':'OBJMAT              object material               : VOID___ ',
+                          'OBJTYPE':'OBJTYPE             object type                   : PLATE ',
+                          'OBJOFF_V':'OBJOFF_V            object vertical offset        : 0 ',
+                          'OBJTPROF':'OBJTPROF            object temp prof              : CONST',
+                          'LAYNUM':'LAYNUM              layers number                 : 0 ',
+                          'DT':'DT                  initial time increment        : 1.D-9',
+                          'DTMAX':'DTMAX               maximum timestep              : 1.D-3',
+                          'TEND':'TEND                end time                      : 1.D-6',
+                          'DTSAVE':'DTSAVE              save interval                 : 1.D-7',
+                          'BND_L':'BND_L               left                          : FREESLIP',
+                          'BND_R':'BND_R               right                         : FREESLIP',
+                          'BND_B':'BND_B               bottom                        : NOSLIP',
+                          'BND_T':'BND_T               top                           : OUTFLOW',
+                          'AVIS':'AVIS                art. visc. linear             : 0.2D0',
+                          'AVIS2':'AVIS2               art. visc. quad.              : 1.0D0',
+                          'TR_QUAL':'TR_QUAL             integration qual.             : 1',
+                          'TR_SPCH':'TR_SPCH             tracer spacing X              : 2.5D-6   : 2.5D-6',
+                          'TR_SPCV':'TR_SPCV             tracer spacing Y              : 2.5D-6   : 2.5D-6',
+                          'TR_VAR':'TR_VAR              add. tracer fiels             : #TrP-TrT#',
+                          'STRESS':'STRESS              Consider stress               : 1',
+                          'PARTPRES':'PARTPRES            Pres. in part.                : 1',
+                          'QUALITY':'QUALITY             Compression rate              : -50',
+                          'VARLIST':'VARLIST             List of variables             : #Den-Tmp-Pre-Sie-Yld-VEL#',
+                          'PARNUM':'PARNUM      Number of particle classes        : 2 ',
+                          'PARMAT':'PARMAT      Material for particle class       : matter1 : matter2 ',
+                          'PARHOBJ':'PARHOBJ     Host object for particles         : 1 : 1 '}
 
     def populate_fromMesh(self,MM,N=None,S=None,E=None,W=None):
         """ 
@@ -960,12 +1015,19 @@ class SetupInp:
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
                                 'COL_SITE':[int(self._colsite(MM))],
                                 'ORIGIN':[int(self._colsite(MM))],
-                                'ALE_MODE':['EULER'],'T_SURF':[298.],
-                                'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
+                                'VEL_CUT':[0],
+                                'T_SURF':[298.],
+                                'GRAD_TYPE':['NONE'],
+                                'LAYNUM':[0]}
+        #'ALE_MODE':['EULER']
         self.ProjParams = {'OBJNUM':[1],
-                           'OBJRESH':[int(math.ceil(MM.x/2.))],'OBJRESV':[int(math.ceil(MM.y/2.))],
-                           'OBJMAT':['VOID___'],'OBJTYPE':['PLATE'],'OBJTPROF':['CONST'],
-                           'OBJOFF_V':[int(self._colsite(MM)-MM.y-1)],'OBJVEL':[0.]} 
+                           'OBJRESH':[int(math.ceil(MM.x/2.))],
+                           'OBJRESV':[int(math.ceil(MM.y/2.))],
+                           'OBJMAT':['VOID___'],
+                           'OBJTYPE':['PLATE'],
+                           'OBJTPROF':['CONST'],
+                           'OBJOFF_V':[0],#[int(self._colsite(MM)-MM.y-1)],
+                           'OBJVEL':[0.]} 
         self.AdditionalParams = {'PARNUM':[MM.calcNoMats()],
                                  'PARMAT':['matter{:1.0f}'.format(x+1) for x in range(MM.calcNoMats())],
                                  'PARHOBJ':[1for x in range(MM.calcNoMats())]}
@@ -1139,6 +1201,10 @@ class SetupInp:
                     pass
                 else:
                     NewFile += line
+            AddLines = ''
+            for tag in self.AdditionalParams.keys():
+                if not tag in NewFile: AddLines += self.Line(tag)
+            if AddLines != '': NewFile = self.insertAddLines(NewFile,AddLines)
         with open(filepath,'wb') as add2:
             add2.write(NewFile)
         return
@@ -1169,9 +1235,36 @@ class SetupInp:
                     pass
                 else:
                     NewFile += line
+            AddLines = ''
+            for tag in self.MeshGeomParams.keys() + self.GlobSetupParams.keys() + self.ProjParams.keys():
+                if not tag in NewFile: 
+                    AddLines += self.Line(tag)
+            if AddLines != '': NewFile = self.insertAddLines(NewFile,AddLines)
         with open(filepath,'wb') as ast2:
             ast2.write(NewFile)
         return
+
+    def insertAddLines(self,File,AddLines):
+        """ insert additional lines into an input file """
+        NewFile = File[:-6]
+        NewFile += '-'*5 + 'Required Parameters that were not present in the original file' + '-'*5 + '\n' 
+        NewFile += AddLines
+        NewFile += '-'*72+'\n'
+        NewFile += File[-6:]
+        return NewFile
+    
+    def Line(self,tag):
+        """ Create a line in an input file if it doesn't already exist"""
+        line = self.inputText[tag]
+        if tag in self.MeshGeomParams: 
+            line = self._writevals(line,self.MeshGeomParams[tag])
+        if tag in self.GlobSetupParams:
+            line = self._writevals(line,self.GlobSetupParams[tag])
+        if tag in self.ProjParams:
+            line = self._writevals(line,self.ProjParams[tag])
+        if tag in self.AdditionalParams:
+            line = self._writevals(line,self.AdditionalParams[tag])
+        return line
 
     def _writevals(self,line,vals):
         """

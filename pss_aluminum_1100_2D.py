@@ -45,6 +45,8 @@ S.MeshGeomParams['GRIDSPCM'] = 3.e-3
 # set cylindrical geometry to true
 S.MeshGeomParams['CYL'][0] = 1
 S.GlobSetupParams['T_SURF'][0] = 293.
+# Max absolute velocity allowed (prevents spurious cells slowing down the sim)
+S.GlobSetupParams['VEL_CUT'][0] = 10.e3
 
 # set the materials
 S.AdditionalParams['PARMAT'] = ['al-1100','al-1100']
