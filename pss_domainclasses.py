@@ -1,9 +1,10 @@
+import math
 import random
 import warnings
 import numpy as np
 from PIL import Image
-import math
 import cPickle as pickle
+from copy import deepcopy
 import scipy.special as scsp
 from scipy import stats as scst
 import matplotlib.pyplot as plt
@@ -47,6 +48,7 @@ class Mesh:
         self.xx, self.yy = self.xi*cellsize,self.yi*cellsize
         self.mesh = np.zeros((X,Y))
         self.materials = np.zeros((9,X,Y))
+        self.extension = np.zeros((X,Y))
         self.VX = np.zeros((X,Y))
         self.VY = np.zeros((X,Y))
         self.cellsize = cellsize
@@ -567,6 +569,350 @@ class Mesh:
             bounds = [np.amin(self.xx),np.amax(self.xx)]
         return bounds
 
+class ExtZone:
+    """
+    generate an extension zone to be concatenated onto a Mesh instance
+    Its side property dictates which part of the mesh it is attached to
+
+            North
+              |
+              |
+    West----MESH----East
+              |
+              |
+            South
+    """
+    def __init__(self,host,D=100,side='North',fill=0,Vx=0,Vy=0):
+        self.length = D
+        self.side = side
+        self.fill = fill
+        self.host = host
+        if Vx != 0. and Vy == 0.:
+            self.velaxis = 1
+            self.vel = Vx
+        elif Vx == 0 and Vy != 0:
+            self.velaxis = 0
+            self.vel = Vy
+        elif Vx != 0 and Vy != 0:
+            self.velaxis = 2
+            self.vel = [Vx,Vy]
+        elif Vx == 0 and Vy == 0:
+            self.velaxis = 1
+            self.vel = 0
+
+
+        if side in ['North','South']:
+            Nx = self.host.x
+            Ny = D
+        elif side in ['East','West']:
+            Ny = self.host.y
+            Nx = D
+        else:
+            raise ValueError('side must be North, South, East, or West; {} is not allowed'.format(side))
+        self.materials = np.zeros((9,Nx,Ny))
+        self.VX = np.ones((Nx,Ny))*Vx
+        self.VY = np.ones((Nx,Ny))*Vy
+        # true in extension zone, false everywhere else
+        self.extension = np.ones((Nx,Ny))
+        if fill>0:
+            self.materials[fill-1,:,:] = 1.
+        else:
+            pass
+        return
+
+    def details(self):
+        """
+        creates easily printable string of details of this instance
+        """
+        deets  = "Extension zone on the {} side\n".format(self.side)
+        deets += "Domain size: {} x {}\n".format(self.Nx,self.Ny)
+        deets += "Fill material (0 = void): {} \n".format(self.fill)
+        deets += "Assigned velocity\n"
+        deets += "Vx: {} m/s\n".format(np.amax(self.VX)) 
+        deets += "Vy: {} m/s".format(np.amax(self.VY))
+        return deets
+
+class CombinedMesh:
+    """ 
+    When using extension zones, they can be combined with a mesh instance
+    in this class. The result has some of the properties of both, but not 
+    all, because of the incompatibility of the two. It is impossible to 
+    separate them once combined.
+    """
+    def __init__(self,mesh,N=None,S=None,E=None,W=None,ExtendFromMesh=False):
+        self.x = mesh.x
+        self.y = mesh.y
+        self.is_ = 0
+        self.ie_ = mesh.x
+        self.js_ = 0
+        self.je_ = mesh.y
+        self.mats = range(1,9+1)
+        
+        if S is not None: 
+            self.y += S.length
+            self.js_ += S.length
+            self.je_ += S.length
+        if N is not None: 
+            self.y += N.length
+        if W is not None: 
+            self.x += W.length
+            self.is_ += W.length
+            self.ie_ += W.length
+        if E is not None: 
+            self.x += E.length
+
+        self.materials = np.zeros((9,self.x,self.y))
+        self.VX = np.zeros((self.x,self.y))
+        self.VY = np.zeros((self.x,self.y))
+        self.Ncells = self.x*self.y
+        self.xc = np.arange(self.x)+0.5
+        self.yc = np.arange(self.y)+0.5
+        self.yi, self.xi = np.meshgrid(self.yc,self.xc)
+        # reassign main mesh
+        self.materials[:, self.is_:self.ie_, self.js_:self.je_] = mesh.materials
+        self.VX[self.is_:self.ie_, self.js_:self.je_] = mesh.VX
+        self.VY[self.is_:self.ie_, self.js_:self.je_] = mesh.VY
+
+        # assign extension regions
+        if W is not None: self.blockMat(0,self.is_,W.fill,horizontal=False)
+        if E is not None: self.blockMat(self.ie_,self.x,E.fill,horizontal=False)
+        # plates take precedence
+        if S is not None: self.blockMat(0,self.js_,S.fill)
+        if N is not None: self.blockMat(self.je_,self.y,N.fill)
+        if ExtendFromMesh:
+            for i,ii in zip(range(self.is_,self.ie_),range(mesh.x)):
+                if S is not None:
+                    if np.amax(mesh.materials[:,ii,self.js_])>0.:
+                        m = np.where(mesh.materials[:,ii,self.js_]==1.)[0][0]
+                        self.materials[m,i,:self.js_] *= 0.
+                        self.materials[m,i,:self.js_] = 1.
+                    else:
+                        self.materials[m,i,:self.js_] *= 0.
+                if N is not None:
+                    if np.amax(mesh.materials[:,i,self.je_])>0.:
+                        m = np.where(mesh.materials[:,i,self.je_]==1.)[0][0]
+                        self.materials[m,i,self.je_:] *= 0.
+                        self.materials[m,i,self.je_:] = 1.
+                    else:
+                        self.materials[m,i,self.je_:] *= 0.
+            for j,jj in zip(range(self.js_,self.je_),range(mesh.y)):
+                if W is not None:
+                    if np.amax(mesh.materials[:,self.is_,jj])>0.:
+                        m = np.where(mesh.materials[:,self.is_,jj]==1.)[0][0]
+                        self.materials[m,:self.is_,j] *= 0.
+                        self.materials[m,:self.is_,j] = 1.
+                    else:
+                        self.materials[m,:self.is_,j] *= 0.
+                if E is not None:
+                    if np.amax(mesh.materials[:,self.ie_-1,jj])>0.:
+                        m = np.where(mesh.materials[:,self.ie_-1,jj]==1.)[0][0]
+                        self.materials[m,self.ie_:,j] *= 0.
+                        self.materials[m,self.ie_:,j] = 1.
+                    else:
+                        self.materials[m,self.ie_:,j] *= 0.
+                        
+        return
+
+    def blockMat(self,kmin,kmax,mat,horizontal=True):
+        """
+        Assign a block of the mesh a single material
+        kmin and kmax are in cells
+        """
+        assert kmin<kmax, "ERROR: kmin must be greater than kmax!"
+        if horizontal:
+            self.materials[:,:,kmin:kmax] *= 0.
+            self.materials[mat-1,:,kmin:kmax] = 1.
+        else:
+            self.materials[:,kmin:kmax,:] *= 0.
+            self.materials[mat-1,kmin:kmax,:] = 1.
+            #self.materials[:,kmin:kmax,self.js_:self.je_] *= 0.
+            #self.materials[mat-1,kmin:kmax,self.js_:self.je_] = 1.
+        return
+
+    def blockVel(self,kmin,kmax,vel,velaxis=0,horizontal=True):
+        """
+        similar to platevel except that vertical blocks can be assigned now as well
+        Assign velocity in a plate shape; works both horizontally and vertically.
+        In this version kmin and kmax are in cells
+        """
+        assert kmin<kmax, "ERROR: kmin must be greater than kmax!"
+        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
+        if horizontal:
+            if velaxis == 0:
+                self.VX[:,kmin:kmax] = vel
+            elif velaxis == 1:
+                self.VY[:,kmin:kmax] = vel
+            elif velaxis == 2:
+                assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
+                self.VX[:,kmin:kmax] = vel[0]
+                self.VY[:,kmin:kmax] = vel[1]
+        else:
+            if velaxis == 0:
+                self.VX[kmin:kmax,self.js_:self.je_] = vel
+            elif velaxis == 1:
+                self.VY[kmin:kmax,self.js_:self.je_] = vel
+            elif velaxis == 2:
+                assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
+                self.VX[kmin:kmax,self.js_:self.je_] = vel[0]
+                self.VY[kmin:kmax,self.js_:self.je_] = vel[1]
+        return
+    
+    def viewVels(self,save=False,fname='vels.png'):
+        """
+        View velocities in a simple plot, and save the plot as a png if wanted.
+        """
+        self.checkVels()
+        fig = plt.figure()
+        if self.x > self.y:
+            subplotX, subplotY = 211, 212
+            orientation='horizontal'
+        else:
+            subplotX, subplotY = 121, 122
+            orientation='vertical'
+        axX = fig.add_subplot(subplotX,aspect='equal')
+        axY = fig.add_subplot(subplotY,aspect='equal')
+
+        dividerX = make_axes_locatable(axX)
+        dividerY = make_axes_locatable(axY)
+        
+        pvx = axX.pcolormesh(self.xi,self.yi,self.VX, 
+                cmap='PiYG',vmin=np.amin(self.VX),vmax=np.amax(self.VX))
+        pvy = axY.pcolormesh(self.xi,self.yi,self.VY, 
+                cmap='coolwarm',vmin=np.amin(self.VY),vmax=np.amax(self.VY))
+        
+        axX.set_title('$V_x$')
+        axY.set_title('$V_y$')
+
+        if orientation == 'horizontal':
+            caxX = dividerX.append_axes("bottom", size="5%", pad=0.5)
+            caxY = dividerY.append_axes("bottom", size="5%", pad=.5)
+        elif orientation == 'vertical':
+            caxX = dividerX.append_axes("right", size="5%", pad=0.05)
+            caxY = dividerY.append_axes("right", size="5%", pad=0.05)
+
+        cbX = fig.colorbar(pvx,orientation=orientation,ax=axX,cax=caxX)
+        cbY = fig.colorbar(pvy,orientation=orientation,ax=axY,cax=caxY)
+        for ax in [axX,axY]:
+            ax.set_xlim(0,self.x)
+            ax.set_ylim(0,self.y)
+            ax.set_xlabel('$x$ [cells]')
+            ax.set_ylabel('$y$ [cells]')
+        cbX.set_label('ms$^{-1}$')
+        cbY.set_label('ms$^{-1}$')
+        fig.tight_layout()
+        if save: fig.savefig(fname,bbox_inches='tight',dpi=300)
+        plt.show()
+
+    def viewMats(self,save=False,fname='mats.png'):
+        """
+        View all material fields in a simple matpltolib plot
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111,aspect='equal')
+        for KK in range(9):
+            matter = np.copy(self.materials[KK,:,:])*(KK+1)
+            matter = np.ma.masked_where(matter==0.,matter)
+            ax.pcolormesh(self.xi,self.yi,matter, cmap='terrain',vmin=1,vmax=9+1)
+        ax.set_xlim(0,self.x)
+        ax.set_ylim(0,self.y)
+        ax.set_xlabel('$x$ [cells]')
+        ax.set_ylabel('$y$ [cells]')
+        if save: fig.savefig(fname,bbox_inches='tight',dpi=300)
+        plt.show()
+    
+    def checkVels(self):
+        """
+        Ensures no void cells have velocities.
+        """
+        total = np.sum(self.materials,axis=0)
+        # make sure that all void cells have no velocity
+        self.VX[total==0.] = 0.
+        self.VY[total==0.] = 0.
+    
+    def calcNoMats(self):
+        # make list of used material numbers
+        # iterate through them all
+        usedmats = self.mats[:]
+        for mm in self.mats:
+            # If a material hasn't been used...
+            total = np.sum(self.materials[mm-1])
+            # ...remove from usedmats list
+            if total == 0.: usedmats.remove(mm)
+        NM = len(usedmats)
+        return NM
+    
+    def save(self,fname='meso_m.iSALE',compress=False):
+        """
+        Saves the combined mesh as a text file that can be read, 
+        verbatim into iSALE. (similar to Mesh.save)
+        This compiles the integer indices of each cell, 
+        as well as the material in them and the fraction
+        of matter present. It saves all this as the filename specified by the user, 
+        with the default as 
+        meso_m.iSALE
+        
+        This version of the function works for continuous and solid materials, 
+        such as a multiple-plate setup.
+        It does not need to remake the mesh as there is no particular matter present.
+        
+        Args:
+            fname   : The filename to be used for the text file being used
+            info    : Include particle ID (i.e. #) as a column in the final file 
+            compress: compress the file? For large domains it is often necessary to avoid very large files; uses gz
+        
+        returns nothing but saves all the info as a txt file called 'fname' and 
+        populates the materials mesh.
+        """
+        self.checkVels()
+        ncells = self.x*self.y
+        XI    = np.zeros((ncells))    
+        YI    = np.zeros((ncells))
+        UX    = np.zeros((ncells))
+        UY    = np.zeros((ncells))
+        K     = 0
+        
+        NM = self.calcNoMats()
+        usedmats = self.mats[:]
+        
+        FRAC = np.zeros((NM,ncells))
+        for j in range(self.x):
+            for i in range(self.y):
+                XI[K] = i
+                YI[K] = j
+                UX[K] = self.VX[j,i]
+                UY[K] = self.VY[j,i]
+                for mm in range(NM):
+                    FRAC[mm,K] = self.materials[usedmats[mm]-1,j,i]
+                K += 1
+        FRAC = self._checkFRACs(FRAC,NM)
+        HEAD = '{},{}'.format(K,NM)
+        ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))
+        if compress: fname += '.gz'
+        np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
+    
+    def _checkFRACs(self,FRAC,NM):
+        """
+        This function checks all the volume fractions in each cell and deals with 
+        any occurrences where they add to more than one
+        by scaling down ALL fractions in that cell, such that it is only 100% full.
+        
+        FRAC : Array containing the full fractions in each cell of each material
+        """ 
+        for i in range(self.x*self.y):
+            SUM = np.sum(FRAC[:,i])
+            if SUM > 1.:
+                done = False
+                for j in range(NM):
+                    if FRAC[j,i] > 0 and done == False: 
+                        FRAC[j,i] = 1.
+                        done = True
+                    else:
+                        FRAC[j,i] = 0.
+            else:
+                pass
+        
+        return FRAC
+
 class SetupInp:
     """
     Takes user-inputs to construct the necessary .inp files for iSALE
@@ -596,16 +942,22 @@ class SetupInp:
         self.AdditionalParams = {'PARNUM':[1],
                                  'PARMAT':['matter1'],
                                  'PARHOBJ':[1]}
+        self.AllParams = [self.MeshGeomParams,self.GlobSetupParams,self.ProjParams,self.AdditionalParams]
+        self.AllParamsOld = deepcopy(self.AllParams) 
 
-    def populate_fromMesh(self,MM):
-        """ popuate the dictionary from an existing Mesh instance """
+    def populate_fromMesh(self,MM,N=None,S=None,E=None,W=None):
+        """ 
+        popuate the dictionary from an existing Mesh instance 
+        NSEW should be ExtZone instances that are part of Mesh
+        or will be part of Mesh
+        """
 
         self.MeshGeomParams = {'GRIDH':[0,MM.x,0],'GRIDV':[0,MM.y,0],
                                'GRIDEXT':[1.05],'GRIDSPC':[MM.cellsize],
                                'GRIDSPCM':[-20],
                                'CYL':[0.]}
         self.GlobSetupParams = {'S_TYPE':['IMPRT_GEOM'],
-                                'COL_SITE':[self._colsite(MM)],
+                                'COL_SITE':[int(self._colsite(MM))],
                                 'ALE_MODE':['EULER'],'T_SURF':[298.],
                                 'GRAD_TYPE':['NONE'],'LAYNUM':[0]}
         self.ProjParams = {'OBJNUM':[1],
@@ -614,8 +966,61 @@ class SetupInp:
                            'OBJOFF_V':[int(self._colsite(MM)-MM.y-1)],'OBJVEL':[0.]} 
         self.AdditionalParams = {'PARNUM':[MM.calcNoMats()],
                                  'PARMAT':['matter{:1.0f}'.format(x+1) for x in range(MM.calcNoMats())],
-                                 'PARHOBJ':[1 for x in range(MM.calcNoMats())]}
+                                 'PARHOBJ':[1for x in range(MM.calcNoMats())]}
+    
+        # extract extension zone details
+        if N is not None: self.MeshGeomParams['GRIDV'][2] = int(N.length)
+        if S is not None: self.MeshGeomParams['GRIDV'][0] = int(S.length)
+        if E is not None: self.MeshGeomParams['GRIDH'][2] = int(E.length)
+        if W is not None: self.MeshGeomParams['GRIDH'][0] = int(W.length)
 
+        self.AllParams = [self.MeshGeomParams,self.GlobSetupParams,self.ProjParams,self.AdditionalParams]
+        self.checkAllParams()
+
+    def checkAllParams(self):
+        """
+        This function checks any parameter alterations made by the program (or the user) and
+        flags up any inconsistencies/makes corrections where possible. If successful, the old
+        parameter set is updated to the new one, otherwise a warning is returned.
+        """
+        if self.AllParamsOld == self.AllParams:
+            pass
+        else:
+            # cycle through all params
+            firstADDPRMS = False
+            WARN = False
+            for oldPs, newPs in zip(self.AllParamsOld,self.AllParams):
+                for k in oldPs.keys():
+                    # check gridv
+                    if k == 'GRIDV':
+                        # if the collision site has remained the same but GRIDV ext zone has changed...
+                        if self.GlobSetupParams['COL_SITE'] == self.AllParams[1]['COL_SITE'] and newPs[k][0] != oldPs[k][0]:
+                            if newPs[k][0] > oldPs[k][0]: 
+                                self.GlobSetupParams['COL_SITE'][0] += abs(newPs[k][0] - oldPs[k][0])
+                            elif newPs[k][0] < oldPs[k][0]: 
+                                self.GlobSetupParams['COL_SITE'][0] -= abs(newPs[k][0] - oldPs[k][0])
+                            else:
+                                pass
+                    # check if number of materials in additional params is correct
+                    if k in ['PARNUM','PARMAT','PARHOBJ'] and firstADDPRMS:
+                        firstADDPRMS = True
+                        if newPs['PARNUM'][0] != len(newPs['PARHOBJ']) \
+                                or newPs['PARNUM'][0] != len(newPs['PARMAT']):
+                            message = 'The number of materials in PARMAT ({}) or PARHOBJ ({}) does not equal PARNUM ({})'.format(len(newPs['PARMAT']),
+                                    len(newPs['PARHOBJ']),newPs['PARNUM'][0])
+                            warnings.warn(message)
+                            WARN = True
+                    # check that the number of layers is not greater than 0 in import geom mode
+                    if k == 'LAYNUM' and self.GlobSetupParams['S_TYPE'][0]=='IMPRT_GEOM':
+                        if newPs[k][0]>0: 
+                            warnings.warn('IMPRT_GEOM does not support usage of layers, LAYNUM set to 0')
+                            self.GlobSetupParams['LAYNUM'][0] = 0
+            if WARN != True:
+                self.AllParamsOld = deepcopy(self.AllParams)
+            else:
+                warnings.warn('There were some errors in the last parameter set; fix these before continuing')
+        return
+                                    
     def calc_extzone(self,Length,Direction='East',TotalLength=0.):
         """
         Calculates the extension zone size (and updates the internal value) as well as the necessary OBJRES 
@@ -625,7 +1030,7 @@ class SetupInp:
         GRIDSPC = self.MeshGeomParams['GRIDSPC']
         GRIDSPCM = -self.MeshGeomParams['GRIDSPCM']
         GRIDEXT = self.MeshGeomParams['GRIDEXT']
-        assert GRIDSPCM > 0, "ERROR: pySALESetup can not cope with GRDISPCM > 0 yet"
+        assert GRIDSPCM > 0, "ERROR: calc_extzone will not perform correctly with GRDISPCM > 0 yet"
         l=0                                      # Physical size of extension zone during calculation
         n=0                                      # No. cells in extension zone calculator
         while (l<=Length):                       # calculate actual length (metres)
@@ -687,6 +1092,10 @@ class SetupInp:
                             self.ProjParams[tag] = self._getval(line)
                     if tag == 'DT': 
                         StopSearch = True
+        # some input parameters will be influenced by params in asteroid.inp
+        # e.g. col_site, update these here.
+        self.checkAllParams()
+        return
     
     def read_addinp(self, filepath='./additional.inp'):
         """
@@ -703,13 +1112,15 @@ class SetupInp:
                     pass
                 else:
                     tag = line[:11].strip()
-
                     if self.AdditionalParams.has_key(tag): self.AdditionalParams[tag] = self._getval(line)
+        # check the extracted params for errors
+        self.checkAllParams()
     
     def write_addinp(self, filepath='./additional.inp'):
         """
         Write dictionary contents into the correct locations in the additional input file
         """
+        self.checkAllParams()
         uneededparams = ['PARRESH','PARTYPE','PARFRAC','PARDIST','PARRANGE']
         with open(filepath,'rb') as add:
             NewFile = ''
@@ -842,6 +1253,8 @@ class SetupInp:
     def _colsite(self,mesh):
         """
         Calculates location of collision site within the simulation from the velocities
+        NB +2 because in FORTRAN cells are indexed from 1, not 0, and the cell is the one above 
+        the collision boundary: colsite of 399 == 401 in iSALE
         """
         uniqueVY = np.unique(mesh.VY)
         # if only one velocity in mesh => all moving in one direction OR stationary
@@ -851,11 +1264,13 @@ class SetupInp:
             # if material travelling down: Cstie at base of mesh
             if uniqueVY < 0.: Csite = 1
             # if up: at top of mesh
-            if uniqueVY >= 0.: Csite = mesh.Y+1
+            if uniqueVY >= 0.: Csite = mesh.Y+2
         else:
             # if two vels then collision at material boundary between two of vels
-            maxVY = np.amax(uniqueVY)
-            Csite = np.argmax(mesh.VY==maxVY)+1
+            minVY = np.amin(uniqueVY)
+            Csite = np.argmax(mesh.VY==minVY)+2
+        # collision site is measured from base of mesh INCLUDING extension zone
+        Csite += self.MeshGeomParams['GRIDV'][0]
         return Csite
     
 
