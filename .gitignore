@@ -4,5 +4,6 @@
 *.pyc
 *.txt
 *.png
+*.swp
 !docs/*.txt
 *.obj
