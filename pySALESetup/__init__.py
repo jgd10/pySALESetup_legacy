@@ -11,10 +11,10 @@ import matplotlib.path   as mpath
 from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from pss_functions import *
-from pss_domainclasses import *
-from pss_grainclasses import *
-from pss_objectclasses import *
+from functions import *
+from grainclasses import *
+from objectclasses import *
+from domainclasses import *
 
 print " ===================================================== "
 print "               _______   __   ________    __           "
