@@ -1,11 +1,3 @@
-# Remove the randomness from the function.
-# Can we make a grain both highly angluar and highly elliptical, then morph it to be less angular, more spherical? Iterative process?
-# Shrink radii slowly? Simulate it as if geological. Moving average around shape to round it?
-# Construct a bunch of highly elliptical, angular shapes, then reduce these effects. All to construct this library!
-# Geologists ACTUALLY look at the angularity and the eccentricity (or sphericity) and we will know this info.
-# Gareth's idea is to have 2 algorithms, one to generate a grain, one to smooth it. Numbers with no random element can go in/be stored for later use.
-
-
 import numpy as np
 import random
 import matplotlib.pyplot as plt
