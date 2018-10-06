@@ -1,0 +1,9 @@
+#ISADD
+---------------------------------------------------------------------------------------------------------------------------------------
+---this is an additional input file used to specify particle classes
+---------------------------------------------------------------------------------------------------------------------------------------
+PARNUM      Number of particle classes    : 5 
+PARMAT      Material for particle class   : driver : walls : matrix : window : bead 
+PARHOBJ     Host object for particles     : 3 : 3 : 3 : 3 : 3 
+------------------------------------------------------------------------------------------
+<<END
