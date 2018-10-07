@@ -1,3 +1,14 @@
+"""
+This script generates grains that can be used by pySALESetup
+
+Grains are generated and classified based on the following metrics:
+
+L = length of rectangle enclosing grain
+B = width of rectangle enclosing grain
+Area_ratio = area of grain/area of enclosing rectangle
+aspect_ratio = L/B (hardcoded as 1.35 currently)
+q = radius of the largest circle enclosed by the grain
+"""
 import numpy as np
 import random
 import matplotlib.pyplot as plt
