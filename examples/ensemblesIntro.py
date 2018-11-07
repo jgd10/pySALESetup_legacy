@@ -24,7 +24,7 @@ for i in range(150):
     ecc = min(random.random()*0.75+0.5,0.8)
     # Create a Grain instance! elps_params = [major radius in cells, eccentricity]
     # default is 10 cells equivalent radius
-    grain = pss.Grain(shape='ellipse',rot=rot,elps_params=[10.,ecc])
+    grain = pss.Grain(shape='ellipse',rot=rot,eqr=10.,elps_eccen=ecc)
     # place the first 100 grains randomly into free spaces
     # for now we are just using one material.
     if i < 100: 

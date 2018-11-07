@@ -110,7 +110,7 @@ def combine_meshes(mesh2,mesh1,axis=1):
         Yw = mesh1.y + mesh2.y
         Xw = mesh1.x
     # cellsize and mixed not important here because all material already placed and output is independent of cellsize
-    New = Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False,label=mesh2.name+mesh1.name)
+    New = psd.Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False,label=mesh2.name+mesh1.name)
     New.materials = np.concatenate((mesh1.materials,mesh2.materials),axis=1+axis)
     New.mesh = np.concatenate((mesh1.mesh,mesh2.mesh),axis=axis)
     New.VX = np.concatenate((mesh1.VX,mesh2.VX),axis=axis)

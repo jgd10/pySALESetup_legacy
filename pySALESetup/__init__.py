@@ -11,7 +11,7 @@ import matplotlib.path   as mpath
 from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from functions import *
+from pssfunctions import *
 from grainclasses import *
 from objectclasses import *
 from domainclasses import *
