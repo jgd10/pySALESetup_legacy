@@ -1,9 +1,15 @@
+from __future__ import print_function
+from __future__ import absolute_import
+
 import random
 import warnings
 import numpy as np
 from PIL import Image
 from math import ceil
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
 import scipy.special as scsp
 from scipy import stats as scst
 import matplotlib.pyplot as plt
@@ -11,9 +17,9 @@ import matplotlib.path   as mpath
 from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-import domainclasses as psd
-import grainclasses as psg
-import objectclasses as pso
+from . import domainclasses as psd
+#from . import grainclasses as psg
+#from . import objectclasses as pso
 
 def quickFill(grain,target,volfrac,ensemble,
         material=1,method='insertion',xbnds=None,ybnds=None,nooverlap=False,mattargets=None):

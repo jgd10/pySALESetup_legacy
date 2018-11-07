@@ -1,9 +1,15 @@
+from __future__ import print_function
+from __future__ import absolute_import
+
 import math
 import random
 import warnings
 import numpy as np
 from PIL import Image
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
 from copy import deepcopy
 import scipy.special as scsp
 from scipy import stats as scst
@@ -12,9 +18,9 @@ import matplotlib.path   as mpath
 from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-import pssfunctions as psf
-import grainclasses as psg
-import objectclasses as pso
+#from . import grainclasses as psg
+#from . import objectclasses as pso
+#from . import pssfunctions as psf
 
 class Mesh:
     """
@@ -480,8 +486,8 @@ class Mesh:
         matrix_por = (matrix_vol - remain_vol)/float(matrix_vol)
         if Print:
             distension = 1./(1.-matrix_por)
-            print "bulk porosity = {:3.3f}%".format(bulk*100.)
-            print "Matrix: porosity = {:3.3f}% and distension = {:3.3f}".format(matrix_por*100.,distension)
+            print("bulk porosity = {:3.3f}%".format(bulk*100.))
+            print("Matrix: porosity = {:3.3f}% and distension = {:3.3f}".format(matrix_por*100.,distension))
         return matrix_por*100.
     
     def calcNoMats(self):
@@ -554,12 +560,12 @@ class Mesh:
             ALL  = np.column_stack((XI,YI,UX,UY,FRAC.transpose()))
         if compress: 
             fname += '.gz'
-            print "compressing..."
+            print("compressing...")
         else:
-            print "saving..."
+            print("saving...")
 
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
-        print "saved"
+        print("saved")
     
     def save_oldver(self,fname='meso_m.iSALE'):
         """
@@ -597,7 +603,7 @@ class Mesh:
                 K += 1
         FRAC = self._checkFRACs(FRAC)
         HEAD = '{},{}'.format(K,NM)
-        print "Output mesh {} has shape {} x {}".format(fname,self.x,self.y)
+        print("Output mesh {} has shape {} x {}".format(fname,self.x,self.y))
         ALL  = np.column_stack((XI,YI,FRAC.transpose()))                                               
         np.savetxt(fname,ALL,header=HEAD,fmt='%5.3f',comments='')
     
