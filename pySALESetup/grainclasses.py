@@ -1,9 +1,15 @@
+from __future__ import print_function
+from __future__ import absolute_import
+
 import random
 import warnings
 import numpy as np
 from PIL import Image
 from math import ceil
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
 import scipy.special as scsp
 from scipy import stats as scst
 import matplotlib.pyplot as plt
@@ -11,9 +17,9 @@ import matplotlib.path   as mpath
 from collections import Counter, OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-import domainclasses as psd
-import objectclasses as pso
-import pssfunctions as psf
+#from . import domainclasses as psd
+#from . import objectclasses as pso
+from . import pssfunctions as psf
 
 class Grain:
     """
@@ -26,7 +32,7 @@ class Grain:
     def __init__(self, eqr=10., rot=0., shape='circle', 
             File=None, elps_eccen=None, poly_params=None, mixed=False, name='grain1', Reload=False):
         """
-        When initialised the type of shape must be specified. Currently pySALESetup can handle N-sided polygons, 
+        When initialised the type of shape must be specified. Currently . can handle N-sided polygons, 
         circles and ellipses. Other shapes can be added if and when necessary (e.g. hybrids).
         Mixed cells mode has not been fully tested yet.   
 
@@ -44,7 +50,7 @@ class Grain:
         self.name = name
         if Reload:
             self.load()
-            print 'loaded {}'.format(self.name)
+            print('loaded {}'.format(self.name))
         else:
             self.equiv_rad = eqr
             self.angle = rot
@@ -73,7 +79,7 @@ class Grain:
             self.mesh = psf.grainfromVertices(R=poly_params,eqv_rad=self.equiv_rad,mixed=self.mixed,rot=rot)
             self.area = np.sum(self.mesh)
         else:
-            print "ERROR: unsupported string -- {} --  used for shape.".format(self.shape)
+            print("ERROR: unsupported string -- {} --  used for shape.".format(self.shape))
         # more to be added...
         self.Px,self.Py = np.shape(self.mesh)
     def details(self):
@@ -305,7 +311,7 @@ class Grain:
             if counter>10000:
                 nospace = True
                 passes= 1
-                print "No coords found after {} iterations; exiting".format(counter)
+                print("No coords found after {} iterations; exiting".format(counter))
                 break
         if nospace:
             pass
@@ -428,7 +434,7 @@ class Grain:
             nospace, overlap = self._checkCoords(x,y,target,overlap_max=cell_limit)
             counter += 1
             if counter>=10000:
-                print "No coords found after {} iterations; exiting".format(counter)
+                print("No coords found after {} iterations; exiting".format(counter))
                 break
         
             if nospace or (nospace == False  and overlap == 0):
@@ -490,7 +496,7 @@ class Ensemble:
         if Reload:
             self.load()
             self.hostmesh = hostmesh
-            print 'loaded {}'.format(self.name)
+            print('loaded {}'.format(self.name))
         else:
             self.hostmesh = hostmesh
             self.grains = []
@@ -675,7 +681,7 @@ class Ensemble:
         """
         Print out the area fraction; this is a user-accessible function
         """
-        print self._vfrac()
+        print(self._vfrac())
     
     def frequency(self):
         """
