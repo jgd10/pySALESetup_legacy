@@ -32,7 +32,7 @@ class Grain:
     def __init__(self, eqr=10., rot=0., shape='circle', 
             File=None, elps_eccen=None, poly_params=None, mixed=False, name='grain1', Reload=False):
         """
-        When initialised the type of shape must be specified. Currently . can handle N-sided polygons, 
+        When initialised the type of shape must be specified. Currently pySALESetup can handle N-sided polygons, 
         circles and ellipses. Other shapes can be added if and when necessary (e.g. hybrids).
         Mixed cells mode has not been fully tested yet.   
 
