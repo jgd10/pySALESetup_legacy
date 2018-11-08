@@ -676,6 +676,7 @@ class Ensemble:
         Calculate the area fraction the ensemble occupies in the domain
         """
         self.vfrac = np.sum(self.areas)/float(self.hostmesh.Ncells)
+        return self.vfrac
 
     def print_vfrac(self):
         """
