@@ -116,7 +116,7 @@ def combine_meshes(mesh2,mesh1,axis=1):
         Yw = mesh1.y + mesh2.y
         Xw = mesh1.x
     # cellsize and mixed not important here because all material already placed and output is independent of cellsize
-    New = psd.Mesh(X=Xw,Y=Yw,cellsize=2.e-6,mixed=False,label=mesh2.name+mesh1.name)
+    New = psd.Mesh(X=Xw,Y=Yw,cellsize=mesh1.cellsize,mixed=False,label=mesh2.name+mesh1.name)
     New.materials = np.concatenate((mesh1.materials,mesh2.materials),axis=1+axis)
     New.mesh = np.concatenate((mesh1.mesh,mesh2.mesh),axis=axis)
     New.VX = np.concatenate((mesh1.VX,mesh2.VX),axis=axis)
@@ -363,13 +363,19 @@ def grainfromEllipse(r_,a_,e_,radians=True):
     if radians is not True: a_ = a_*np.pi/180.
     assert e_ >= 0 and e_ < 1, "ERROR: eccentricity can not be less than 0 and must be less than 1; {} is not allowed".format(e_)
     assert r_>0, "ERROR: Radius must be greater than 0!"
-    N = int(2.*ceil(r_)+2.)
-    mesh0 = np.zeros((N,N))
-    x0 = r_ + 1                                                                                   
-    y0 = r_ + 1                                                                                   
+
     # A is the semi-major radius, B is the semi-minor radius
     A = r_/((1.-e_**2.)**.25)
-    B = A*np.sqrt(1.-e_**2.)                                                                                
+    B = A*np.sqrt(1.-e_**2.)
+
+    # Make mini mesh bigger than semi-major axis
+    N = int(2.*ceil(A)+2.)
+    mesh0 = np.zeros((N,N))
+
+    # Centre of ellipse
+    x0 = A + 1
+    y0 = A + 1
+
     for j in range(N):
         for i in range(N):
             xc = 0.5*(i + (i+1)) - x0
