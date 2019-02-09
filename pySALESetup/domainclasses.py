@@ -378,7 +378,7 @@ class Mesh:
         Assign velocity in a plate shape; works both horizontally and vertically.
         """
         assert mmin<mmax, "ERROR: ymin must be greater than ymax!"
-        assert axis==0 or axis==1 "ERROR: axis can only be horizontal (0), vertical (1)!"
+        assert axis==0 or axis==1, "ERROR: axis can only be horizontal (0), vertical (1)!"
         if axis == 1:
             if Vx is not None:
                 assert type(Vx) == float, "ERROR: Velocity must be a float"
