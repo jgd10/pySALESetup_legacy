@@ -347,51 +347,52 @@ class Mesh:
             self.VX *= multiplier
             self.VY *= multiplier
 
-    def matVel(self,vel,mat,axis=1):
+    def matVel(self, mat, Vx=None, Vy=None):
         """
         Assign a blanket velocity to one material 
         Useful before merging meshes or when using other objects in iSALE.
         """
-        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
         matpresence = self.materials[mat-1]
 
-        if axis == 0:
-            self.VX[matpresence==1.] = vel
-        elif axis == 1:
-            self.VY[matpresence==1.] = vel
-        elif axis == 2:
-            assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
-            self.VX[matpresence==1.] = vel[0]
-            self.VY[matpresence==1.] = vel[1]
+        if Vx is not None:
+            assert type(Vx) is float, "ERROR: velocity must be a float"
+            self.VX[matpresence==1.] = Vx
+        if Vy is not None:
+            assert type(Vy) is float, "ERROR: velocity must be a float"
+            self.VY[matpresence==1.] = Vy
 
-    def blanketVel(self,vel,axis=1):
+    def blanketVel(self, Vx=None, Vy=None):
         """
         Assign a blanket velocity to whole domain. 
         Useful before merging meshes or when using other objects in iSALE.
         """
-        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
-        if axis == 0:
-            self.VX[:,:] = vel
-        elif axis == 1:
-            self.VY[:,:] = vel
-        elif axis == 2:
-            assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
-            self.VX[:,:] = vel[0]
-            self.VY[:,:] = vel[1]
-    def plateVel(self,ymin,ymax,vel,axis=0):
+        if Vx is not None:
+            assert type(Vx) is float, "ERROR: velocity must be a float"
+            self.VX = Vx
+        if Vy is not None:
+            assert type(Vy) is float, "ERROR: velocity must be a float"
+            self.VY = Vy
+    
+    def plateVel(self, mmin, mmax, Vx=None, Vy=None, axis=0):
         """
         Assign velocity in a plate shape; works both horizontally and vertically.
         """
-        assert ymin<ymax, "ERROR: ymin must be greater than ymax!"
-        assert axis==0 or axis==1 or axis==2, "ERROR: axis can only be horizontal (0), vertical (1), or both (2)!"
-        if axis == 0:
-            self.VX[(self.yy>=ymin)*(self.yy<=ymax)] = vel
-        elif axis == 1:
-            self.VY[(self.yy>=ymin)*(self.yy<=ymax)] = vel
-        elif axis == 3:
-            assert len(vel)==2, "ERROR: when giving both a value, vel must be of form vel = [xvel,yvel]"
-            self.VX[(self.yy>=ymin)*(self.yy<=ymax)] = vel[0]
-            self.VY[(self.yy>=ymin)*(self.yy<=ymax)] = vel[1]
+        assert mmin<mmax, "ERROR: ymin must be greater than ymax!"
+        assert axis==0 or axis==1 "ERROR: axis can only be horizontal (0), vertical (1)!"
+        if axis == 1:
+            if Vx is not None:
+                assert type(Vx) == float, "ERROR: Velocity must be a float"
+                self.VX[(self.yy>=mmin)*(self.yy<=mmax)] = Vx
+            if Vy is not None:
+                assert type(Vy) == float, "ERROR: Velocity must be a float"
+                self.VY[(self.yy>=mmin)*(self.yy<=mmax)] = Vy
+        elif axis == 0:
+            if Vx is not None:
+                assert type(Vx) == float, "ERROR: Velocity must be a float"
+                self.VX[(self.xx>=mmin)*(self.xx<=mmax)] = Vx
+            if Vy is not None:
+                assert type(Vy) == float, "ERROR: Velocity must be a float"
+                self.VY[(self.xx>=mmin)*(self.xx<=mmax)] = Vy
 
     def calcVol(self,m=None,frac=False):
         """
