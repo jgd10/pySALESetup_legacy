@@ -20,3 +20,8 @@ Still to be done:
  - Ensembles & material optimisation
  - Fabric Tensor
  - Size Distributions
+ 
+ New Additions:
+ 
+ - pip install added
+ - pytest folder (no tests yet)
