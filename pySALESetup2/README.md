@@ -19,7 +19,6 @@ Still to be done:
  - grain library integration
  - Ensembles & material optimisation
  - Fabric Tensor
- - Size Distributions
  
  New Additions:
  

@@ -1,7 +1,8 @@
 import numpy as np
-from typing import Union, List, Dict, Iterable, Tuple
+from typing import Union, List, Dict, Iterable, Tuple, Callable
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import scipy.special as scsp
 
 
 class Mesh:
@@ -108,7 +109,7 @@ class Mesh:
             if cell[mat] > 0.:
                 self.add_velocity_to_cell(velocity, cell)
 
-    def insert_rectangle(self, material: int, xlims: Tuple[float, float], ylims: Tuple[float, float]):
+    def insert_rectangle(self, material: int, xlims: Tuple[float, float], ylims: Tuple[float, float], ):
         assert 0 <= material <= 9, "material must be an integer between 0 and 9 (0 = Void)"
         for point in points_within_rectangle(self.cell_size, xlims, ylims):
             cell = self._mesh[point]
@@ -148,6 +149,174 @@ class Mesh:
     def add_velocity_to_cell(velocity: Tuple[float, float], cell):
         cell['vel i'] = velocity[0]
         cell['vel j'] = velocity[1]
+
+
+class SizeDistribution:
+    """
+    A size distribution is typically represented by a CDF (cumulative distribution function).
+    This class creates one with user-specified CDF. CDFs are of the form 'frequency' vs 'var'
+    and in granular distributions the independent variable is typically krumbein phi, or radius,
+    however this class allows other types. 'frequency' is often volume (area in 2D) or weight.
+    Both options are available, as is pure dimensionless frequency. Phi and area are the defaults.
+    """
+    def __init__(self, name: str):
+        self._type = None
+        self._mean = None
+        self._std = None
+        self._median = None
+        self._mode = None
+        self._variance = None
+        self._skew = None
+        self._cdf = None
+        self._limits = None
+        self._lambda = None
+        self._k = None
+
+    @classmethod
+    def custom_distribution(cls, name: str, func: Callable):
+        new = cls(name)
+        new._func = func
+        new._cdf = func
+        new._type = 'custom'
+        return new
+
+    @classmethod
+    def uniform_distribution(cls, name: str, size_limits: Tuple[float, float]):
+        uniform = cls(name)
+        uniform._type = 'uniform'
+        uniform._limits = size_limits
+        uniform._mean = .5*(sum(size_limits))
+        uniform._median = uniform._mean
+        uniform._variance = (1. / 12.) * (size_limits[1] - size_limits[0]) ** 2.
+        uniform._cdf = uniform._uniform
+        uniform._skew = 0.
+        return uniform
+
+    @classmethod
+    def normal_distribution(cls, name: str, mean: float, standard_deviation: float):
+        normal = cls(name)
+        normal._type = 'normal'
+        normal._mean = mean
+        normal._std = standard_deviation
+        normal._median = mean
+        normal._mode = mean
+        normal._variance = standard_deviation**2.
+        normal._skew = 0.
+        normal._cdf = normal._normal
+        return normal
+
+    @classmethod
+    def lognormal_distribution(cls, name: str, mu: float, standard_deviation: float):
+        lognormal = cls(name)
+        lognormal._type = 'lognormal'
+        lognormal._mean = np.exp(mu + 0.5 * standard_deviation ** 2.)
+        lognormal._std = standard_deviation
+        lognormal._median = np.exp(mu)
+        lognormal._mode = np.exp(mu - standard_deviation ** 2.)
+        lognormal._variance = (np.exp(standard_deviation ** 2.) - 1.) * np.exp(2. * mu + standard_deviation ** 2.)
+        lognormal._skew = (np.exp(standard_deviation ** 2.) + 2.) * np.sqrt(np.exp(standard_deviation ** 2.) - 1.)
+        lognormal._cdf = lognormal._lognormal
+        return lognormal
+
+    @classmethod
+    def weibull2_distribution(cls, name: str, scale_parameter: float, shape_parameter: float):
+        assert 0. <= scale_parameter, "the scale parameter must be >= 0, not {:2.2f}".format(scale_parameter)
+        assert 0. <= shape_parameter, "the shape parameter must be >= 0, not {:2.2f}".format(shape_parameter)
+        weibull2 = cls(name)
+        weibull2._type = 'weibull2'
+        weibull2._lambda = scale_parameter
+        weibull2._k = shape_parameter
+        weibull2._mean = scale_parameter * scsp.gamma(1. + 1. / shape_parameter)
+        weibull2._median = scale_parameter * (np.log(2.)) ** (1. / shape_parameter)
+        if shape_parameter > 1:
+            weibull2._mode = scale_parameter * ((shape_parameter - 1) / shape_parameter) ** (1. / shape_parameter)
+        else:
+            weibull2._mode = 0
+        weibull2._variance = (scale_parameter ** 2.) * \
+                             (scsp.gamma(1. + 2. / shape_parameter) - (scsp.gamma(1. + 1. / shape_parameter)) ** 2.)
+        weibull2._skew = (scsp.gamma(1. + 3. / shape_parameter) * scale_parameter ** 3. -
+                          3. * weibull2._mean * weibull2._variance - weibull2._mean ** 3.)
+        weibull2._skew /= weibull2._variance ** (3. / 2.)
+        weibull2._cdf = weibull2._weibull2
+        weibull2._type = 'weibull2'
+        return weibull2
+
+    def details(self):
+        deets = "distribution has the following properties:\n"
+        deets += "type: {}\n".format(self._type)
+        deets += "mean = {:2.3f}\n".format(self._mean)
+        deets += "median = {:2.3f}\n".format(self._median)
+        deets += "mode = {:2.3f}\n".format(self._mode)
+        deets += "variance = {:2.3f}\n".format(self._variance)
+        deets += "skewness = {:2.3f}\n".format(self._skew)
+        return deets
+
+    def frequency(self, x: float, dx: Tuple[float, float]):
+        """
+        Integrates over the probability density function of the chosen distribution to return an estimated frequency
+        limits MUST be provided in the form of dx, which allows for uneven limits and is always applied as + and -
+        the given value of x. Returns the probability DENSITY! this must be converted to a useful value outside of
+        the function.
+        """
+        if self._type == 'lognormal':
+            assert x >= 0., "ERROR: Lognormal distribution only works for input greater than 0"
+        f = np.float64(abs(self._cdf(x + dx[1]) - self._cdf(x - dx[0])))
+        return f
+
+    def _uniform(self, x: float):
+        """
+        CDF for a uniform probability density function between minx and maxx
+        """
+        assert self._limits is not None
+        min_x = self._limits[0]
+        max_x = self._limits[1]
+        f = (x - min_x) / (max_x - min_x)
+        if x < min_x:
+            f = 0.
+        elif x >= max_x:
+            f = 1.
+        return f
+
+    def _normal(self, x: float):
+        """
+        CDF for a normal probability density function centred on mu with std sigma
+        """
+        mu = self._mean
+        sigma = self._std
+        f = .5 * (1. + scsp.erf((x - mu) / (sigma * np.sqrt(2.))))
+        return f
+
+    def _lognormal(self, x: float):
+        """
+        CDF for a log-normal probability density function centred on mu with std sigma
+        """
+        mu = self._mean
+        sigma = self._std
+        f = .5 + .5 * scsp.erf((np.log(x) - mu) / (sigma * np.sqrt(2.)))
+        return f
+
+    def _weibull2(self, x: float):
+        """
+        CDF for a Weibull 2-parameter distribution; lambda is the 'scale' of the distribution
+        k is the 'shape'. This distribution is typically used for PSDs generated by
+        grinding, milling, and crushing operations.
+        """
+        assert self._lambda is not None
+        assert self._k is not None
+        lamb = self._lambda
+        k = self._k
+        if x >= 0:
+            f = 1. - np.exp(-(x / lamb) ** k)
+        else:
+            f = 0.
+        return f
+
+
+class Ensemble:
+    def __init__(self, name: str, host_mesh: Mesh, size_distribution: SizeDistribution):
+        self.name = name
+        self._host = host_mesh
+        self._dist = size_distribution
 
 
 def rotate_point(x: float, y: float, rot: float):
